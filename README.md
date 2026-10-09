@@ -18,17 +18,20 @@ Login dan password lama tetap berlaku. URL `/login`, `/admin/login`, `/sopir/*`,
 
 ## Deploy frontend ke Vercel
 
-Deploy dilakukan oleh pemilik project. Gunakan **root repository** sebagai Root Directory, framework **Vite**, dan konfigurasi `vercel.json` yang sudah disediakan:
+Deploy dilakukan oleh pemilik project. Gunakan **`client`** sebagai Root Directory dan framework **Vite**. Biarkan override install/build/output nonaktif; `client/vercel.json` sudah mengatur perintah untuk direktori ini:
 
 | Setting | Nilai |
 | --- | --- |
-| Install Command | `npm ci --prefix client` |
+| Root Directory | `client` |
+| Install Command | `npm ci` |
 | Build Command | `npm run build` |
-| Output Directory | `client/dist` |
+| Output Directory | `dist` |
 | `VITE_SUPABASE_URL` | `https://lvrxcxskroskkeifjyry.supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable key dari `client/.env.local` atau dashboard Supabase |
 
-Isi kedua environment variable pada environment Vercel yang dipakai, kemudian build/deploy. URL halaman dalam aplikasi memakai SPA rewrite. Backend sudah aktif di Supabase dan tidak perlu di-deploy ke Vercel. Tidak ada service role key atau password database di frontend.
+Isi kedua environment variable pada environment Vercel yang dipakai, kemudian build/deploy. Environment variable tidak otomatis diambil dari `.env.local` laptop karena file tersebut tidak masuk Git. URL halaman dalam aplikasi memakai SPA rewrite. Backend sudah aktif di Supabase dan tidak perlu di-deploy ke Vercel. Tidak ada service role key atau password database di frontend.
+
+Untuk project Vercel yang memakai root repository, `vercel.json` di root tetap tersedia dengan install `npm ci --prefix client`, build `npm run build`, dan output `client/dist`. Jangan memakai perintah dengan `--prefix client` apabila Root Directory sudah `client`, karena perintah itu mencari direktori `client/client`.
 
 ## Workflow yang dipertahankan
 
