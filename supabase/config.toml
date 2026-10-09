@@ -1,0 +1,6 @@
+project_id = "lpg-distribution-app"
+
+[functions.lpg-api]
+# Username/password login issues opaque sessions validated inside the function.
+verify_jwt = false
+entrypoint = "./functions/lpg-api/index.ts"

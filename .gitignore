@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Production build
+client/dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+client/.env
+client/.env.local
+.local/
+supabase/.temp/
+supabase/.branches/
+client/test-results/
+client/playwright-report/
+
+# Database local & logs
+*.db
+*.log
+line68.txt
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+/uploads/

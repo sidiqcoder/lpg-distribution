@@ -1,0 +1,13 @@
+# Taste
+- Writes project feedback in Indonesian (Bahasa Indonesia); comfortable relaying client revisions as a numbered list of concrete issues. Confidence: 0.6
+- Wants emoji/emoticons removed from app interfaces — keep UI text plain and professional. Confidence: 0.75
+- Dislikes UI that "looks AI-generated": expects a clean, tidy layout with visually consistent components (e.g. sidebars that don't change appearance between pages). Confidence: 0.7
+- Prefers strong, assertive typography (bolder fonts) over soft/default fonts. Confidence: 0.6
+- Expects the app's visual theme/background to reflect the client company's brand/profile rather than a generic look. Confidence: 0.6
+- Expects interactive elements (icons, buttons) to actually be clickable; dead/non-functional affordances are a defect. Confidence: 0.7
+- Prefers UI that updates automatically — changes should appear without a manual page reload. Confidence: 0.7
+- Expects navigation/back actions to return to the previous page or previously opened menu, never dumping the user back to the login screen. Confidence: 0.7
+- Cares about performance of heavy views (e.g. maps) — long loading times are treated as a defect. Confidence: 0.6
+- Prefers the agent to actually launch/run the project locally for hands-on checking (with URLs and login credentials handed over) rather than only reporting automated test results. Confidence: 0.7
+- Prefers a React frontend (JS SPA — e.g. Vite + React Router) over server-rendered templates for the app's UI. Confidence: 0.55
+- When asked to redo/improve an existing UI, expects it to stay consistent with the previous design content and preserve all earlier agreed revision requests — an evolution, not a departure. Confidence: 0.6

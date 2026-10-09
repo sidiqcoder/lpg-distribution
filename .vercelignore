@@ -1,0 +1,16 @@
+legacy/
+supabase/
+.local/
+.commandcode/
+uploads/
+node_modules/
+client/node_modules/
+client/tests/
+client/test-results/
+client/playwright-report/
+*.db
+*.log
+*.bak
+scripts/
+line68.txt
+repair.js
