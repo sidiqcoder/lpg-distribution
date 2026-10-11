@@ -3,6 +3,7 @@ import { Component } from 'react';
 export default class ErrorBoundary extends Component {
   state = { error: null };
   static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error) { console.error('Gagal menampilkan halaman:', error); }
   render() {
     if (this.state.error) return <div className="card max-w-640" role="alert">
       <h2>Halaman belum dapat ditampilkan</h2>

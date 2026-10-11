@@ -4,7 +4,7 @@ export function openDatabase(url) {
   if (!url) throw new Error('SUPABASE_DB_URL belum tersedia.');
   return postgres(url, {
     max: 1, prepare: false, idle_timeout: 20, connect_timeout: 10,
-    connection: { application_name: 'lpg-api', timezone: 'Asia/Jakarta', statement_timeout: 15000 },
+    connection: { application_name: 'lpg-api', timezone: 'Asia/Makassar', statement_timeout: 15000 },
     types: {
       date: { to: 1082, from: [1082], serialize: String, parse: String },
       bigint: { to: 20, from: [20], serialize: String, parse: Number }

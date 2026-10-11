@@ -1,14 +1,15 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { Link } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
-import { todayWIB } from '../../utils';
+import { todayWITA } from '../../utils';
 import Icon from '../../components/Icon';
 
 export default function DriverOverview() {
   const { user } = useAuth();
   const { data, loading, error, reload } = useApi(`/driver/${user.id}/summary`, { interval: 5000 });
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -17,7 +18,7 @@ export default function DriverOverview() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -73,11 +74,12 @@ export default function DriverOverview() {
 
   return (
     <div className="dashboard-content">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <h1>Ringkasan Operasional Hari Ini</h1>
           <p className="subtitle">
-            Sopir: <strong>{sopir.nama}</strong> &middot; Tanggal: {todayWIB()}
+            Sopir: <strong>{sopir.nama}</strong> &middot; Tanggal: {todayWITA()}
           </p>
         </div>
         <div className="head-badge-wrapper">

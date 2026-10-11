@@ -1,6 +1,7 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
-import { uploadUrl, fmtWaktu } from '../../utils';
+import { uploadUrl, fmtSubmit } from '../../utils';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
 
@@ -8,7 +9,7 @@ export default function ManagerHazards() {
   const { date } = useOutletContext();
   const { data, loading, error, reload } = useApi('/manager/summary', { params: { date }, interval: 8000 });
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -17,7 +18,7 @@ export default function ManagerHazards() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -36,6 +37,7 @@ export default function ManagerHazards() {
 
   return (
     <div className="hazards-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">
@@ -74,6 +76,7 @@ export default function ManagerHazards() {
                 <th>Koordinat GPS</th>
                 <th>Foto Bukti</th>
                 <th>Status Penanganan</th>
+                <th>Jam Submit (WITA)</th>
               </tr>
             </thead>
             <tbody>
@@ -103,11 +106,12 @@ export default function ManagerHazards() {
                         {b.status === 'RESOLVED' ? 'Selesai Ditangani' : 'Dalam Penanganan'}
                       </span>
                     </td>
+                    <td>{fmtSubmit(b.created_at)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="empty-state-cell">
+                  <td colSpan={8} className="empty-state-cell">
                     <Icon name="shield" size={32} />
                     <p>Nihil kejadian bahaya. Seluruh armada beroperasi dalam kondisi aman.</p>
                   </td>

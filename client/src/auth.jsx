@@ -45,7 +45,7 @@ export function RequireRole({ role, children }) {
   const { user, restoring, sessionError } = useAuth();
   const location = useLocation();
   if (restoring) return <div className="card loading-card"><div className="spinner" /><p>Memuat sesi...</p></div>;
-  if (sessionError) return <div className="card"><p>{sessionError.message || 'Koneksi terputus.'}</p><button className="btn btn-primary" onClick={() => window.location.reload()}>Coba Lagi</button></div>;
+  if (sessionError && !user) return <div className="card"><p>{sessionError.message || 'Koneksi terputus.'}</p><button className="btn btn-primary" onClick={() => window.location.reload()}>Coba Lagi</button></div>;
   if (!user || !getToken() || user.role !== role) {
     return <Navigate to={role === 'manager' ? '/admin/login' : '/login'} state={{ from: location.pathname }} replace />;
   }

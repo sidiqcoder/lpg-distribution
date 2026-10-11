@@ -1,9 +1,10 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import { apiJson } from '../../api';
 import { notifyDataChanged } from '../../events';
-import { badgeForLpg, fmtWaktu } from '../../utils';
+import { badgeForLpg, fmtSubmit } from '../../utils';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
 
@@ -17,7 +18,7 @@ export default function ManagerStock() {
   const [feedbackMsg, setFeedbackMsg] = useState('');
   const submittingRef = useRef(false);
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -26,7 +27,7 @@ export default function ManagerStock() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -107,6 +108,7 @@ export default function ManagerStock() {
 
   return (
     <div className="stock-page-layout">
+      <RefreshNotice error={error} />
       {/* Header */}
       <div className="page-head">
         <div>
@@ -288,7 +290,7 @@ export default function ManagerStock() {
                           {b.label}
                         </span>
                       </td>
-                      <td>{fmtWaktu(r.created_at)} WIB</td>
+                      <td>{fmtSubmit(r.created_at)}</td>
                       <td>{r.catatan || <span className="muted">-</span>}</td>
                       <td>
                         {r.status === 'MENUNGGU' ? (
@@ -317,7 +319,7 @@ export default function ManagerStock() {
                         ) : (
                           <div className="reviewed-by-tag">
                             <Icon name={r.status === 'DISETUJUI' ? 'check-circle' : 'x-circle'} size={14} />
-                            <span>{r.disetujui_oleh || 'Manager'} ({fmtWaktu(r.waktu_disetujui)} WIB)</span>
+                            <span>{r.disetujui_oleh || 'Manager'} ({fmtSubmit(r.waktu_disetujui)})</span>
                           </div>
                         )}
                       </td>

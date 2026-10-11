@@ -3,18 +3,23 @@ import { Link } from 'react-router-dom';
 import MapCanvas, { L, dotIcon } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
-import { apiForm, apiJson } from '../../api';
+import { apiForm } from '../../api';
 import { notifyDataChanged } from '../../events';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
+import { useDriverLocation } from '../../components/DriverTelemetry';
+import { distanceToRoute } from '../../tracking';
 
 export default function DriverOnDuty() {
   const { user } = useAuth();
-  const { data, reload } = useApi(`/driver/${user.id}/routes`, { interval: 5000 });
-  const { data: summary } = useApi(`/driver/${user.id}/summary`, { interval: 5000 });
+  const { data, error: routesError, reload } = useApi(`/driver/${user.id}/routes`, { interval: 5000 });
+  const { data: summary, error: summaryError, reload: reloadSummary } = useApi(`/driver/${user.id}/summary`, { interval: 5000 });
+  const [readyMap, setReadyMap] = useState(null);
 
   const mapRef = useRef(null);
-  const plannedRef = useRef([]);
+  const lineRef = useRef(null);
+  const fittedRef = useRef(false);
+  const { position } = useDriverLocation();
   const markerRef = useRef(null);
   const routeMarkerRef = useRef(null);
   const deliveryFormRef = useRef(null);
@@ -34,33 +39,30 @@ export default function DriverOnDuty() {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !data) return;
+    if (!map || !data || !summary?.siapBerangkat) return;
     const points = rute.map((r) => ({ lat: Number(r.latitude), lng: Number(r.longitude) }));
-    plannedRef.current = points;
+    if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
     if (points.length > 1) {
-      L.polyline(points.map((p) => [p.lat, p.lng]), { color: '#b91c1c', weight: 5, dashArray: '8 8' }).addTo(map);
-      map.fitBounds(points.map((p) => [p.lat, p.lng]), { padding: [30, 30] });
+      lineRef.current = L.polyline(points.map((p) => [p.lat, p.lng]), { color: '#b91c1c', weight: 5, dashArray: '8 8' }).addTo(map);
+      if (!fittedRef.current && !map.lpgUserMoved) map.fitBounds(points.map((p) => [p.lat, p.lng]), { padding: [30, 30] });
+      fittedRef.current = true;
     }
-  }, [data]);
+  }, [data, readyMap, summary?.siapBerangkat]);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    const id = navigator.geolocation.watchPosition((pos) => {
-      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
-      const points = plannedRef.current || [];
-      const off = points.length > 0 && Math.min(...points.map((p) => Math.sqrt(Math.pow((lat - p.lat) * 111, 2) + Math.pow((lng - p.lng) * 111 * Math.cos((lat * Math.PI) / 180), 2)))) > 0.5;
-      const map = mapRef.current;
-      if (map) {
-        const icon = dotIcon(off ? '#b91c1c' : '#15803d', 16);
-        if (markerRef.current) markerRef.current.setLatLng([lat, lng]).setIcon(icon);
-        else markerRef.current = L.marker([lat, lng], { icon }).addTo(map);
-        markerRef.current.bindPopup(off ? 'Peringatan: Keluar Jalur Rute' : 'Posisi Kendaraan Aktif');
-      }
-      setOffRoute(off);
-      apiJson('/tracking', { sopir_id: user.id, latitude: lat, longitude: lng, accuracy }).catch(() => {});
-    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
-    return () => navigator.geolocation.clearWatch(id);
-  }, [user.id]);
+    if (!position || !summary?.siapBerangkat) return;
+    const { latitude: lat, longitude: lng, accuracy } = position;
+    const distance = distanceToRoute(lat, lng, data?.rute);
+    const off = distance != null && distance > 0.5 && accuracy <= 100;
+    const map = mapRef.current;
+    if (map) {
+      const icon = dotIcon(off ? '#b91c1c' : '#15803d', 16);
+      if (markerRef.current) markerRef.current.setLatLng([lat, lng]).setIcon(icon);
+      else markerRef.current = L.marker([lat, lng], { icon }).addTo(map);
+      markerRef.current.bindPopup(off ? 'Peringatan: Keluar Jalur Rute' : 'Posisi Kendaraan Aktif');
+    }
+    setOffRoute(off);
+  }, [position, data, readyMap, summary?.siapBerangkat]);
 
   const pickRoute = (r) => {
     setSelected(r);
@@ -127,7 +129,9 @@ export default function DriverOnDuty() {
     }
   };
 
-  if (summary && !summary.siapBerangkat) {
+  if (!summary || !data) return <div className="card"><div className="page-head"><h1>Status On-Duty Pengiriman</h1></div><p>{summaryError?.message || routesError?.message || 'Memuat status pengiriman...'}</p>{(summaryError || routesError) && <button className="btn btn-outline" onClick={() => { reload(); reloadSummary(); }}>Coba Lagi</button>}</div>;
+
+  if (!summary.siapBerangkat) {
     return (
       <div className="status-page-layout">
         <div className="page-head">
@@ -218,7 +222,7 @@ export default function DriverOnDuty() {
                     <div className="route-info-col">
                       <strong>{r.pangkalan_nama}</strong>
                       <span className="muted block text-sm">
-                        Permintaan: {r.permintaan_ton} Ton &middot; Estimasi: {r.estimasi_waktu_tiba || '-'} WIB
+                        Permintaan: {r.permintaan_ton} Ton &middot; Estimasi: {r.estimasi_waktu_tiba || '-'} WITA
                       </span>
                     </div>
                     <div className="route-status-col">
@@ -248,7 +252,10 @@ export default function DriverOnDuty() {
             <h2>Peta Lokasi &amp; Konfirmasi Serah Terima</h2>
           </div>
           <div className="mt-sm">
-            <MapCanvas height={280} onReady={(m) => { mapRef.current = m; }} />
+            <MapCanvas height={280} onReady={(m) => {
+              mapRef.current = m; lineRef.current = null; markerRef.current = null;
+              routeMarkerRef.current = null; fittedRef.current = false; setReadyMap(m);
+            }} />
           </div>
 
           {offRoute && (

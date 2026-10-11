@@ -70,11 +70,12 @@ export default function ManagerLogin() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username manajer"
+                placeholder="manager"
                 required
                 autoComplete="username"
               />
             </div>
+            <small className="muted">Username akun manager: manager</small>
           </div>
 
           <div className="form-group">

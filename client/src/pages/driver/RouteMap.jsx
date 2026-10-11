@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import MapCanvas, { L, numberIcon } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
@@ -7,13 +7,17 @@ import Icon from '../../components/Icon';
 
 export default function DriverRouteMap() {
   const { user } = useAuth();
-  const { data } = useApi(`/driver/${user.id}/routes`);
+  const { data, error, reload } = useApi(`/driver/${user.id}/routes`);
+  const [readyMap, setReadyMap] = useState(null);
   const mapRef = useRef(null);
   const drawnRef = useRef(false);
+  const layerRef = useRef(null);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !data || drawnRef.current) return;
+    if (!map || !data) return;
+    if (layerRef.current) map.removeLayer(layerRef.current);
+    layerRef.current = L.layerGroup().addTo(map);
     const delivered = new Set(data.delivered || []);
     const points = (data.rute || []).map((r) => ({
       lat: Number(r.latitude),
@@ -25,15 +29,15 @@ export default function DriverRouteMap() {
     }));
     if (!points.length) return;
     const latlngs = points.map((p) => [p.lat, p.lng]);
-    L.polyline(latlngs, { color: '#b91c1c', weight: 4, dashArray: '6 6' }).addTo(map);
+    L.polyline(latlngs, { color: '#b91c1c', weight: 4, dashArray: '6 6' }).addTo(layerRef.current);
     points.forEach((p) => {
       L.marker([p.lat, p.lng], { icon: numberIcon(p.done ? '#15803d' : '#b91c1c', p.urutan) })
-        .addTo(map)
+        .addTo(layerRef.current)
         .bindPopup(`<strong>${p.urutan}. ${p.nama}</strong><br>Permintaan: ${p.ton} Ton<br>Status: ${p.done ? 'Sudah Terkirim' : 'Menunggu Pengiriman'}`);
     });
-    map.fitBounds(latlngs, { padding: [40, 40] });
+    if (!drawnRef.current && !map.lpgUserMoved) map.fitBounds(latlngs, { padding: [40, 40] });
     drawnRef.current = true;
-  }, [data]);
+  }, [data, readyMap]);
 
   return (
     <div className="map-page-layout">
@@ -58,7 +62,8 @@ export default function DriverRouteMap() {
       </div>
 
       <div className="card">
-        <MapCanvas height={540} onReady={(m) => { mapRef.current = m; }} />
+        {error && <p className="banner warn" role="alert">{error.message}<button className="btn btn-sm btn-outline" onClick={reload}>Coba Lagi</button></p>}
+        <MapCanvas height={540} onReady={(m) => { mapRef.current = m; setReadyMap(m); }} />
         <div className="map-legend-bar mt-sm">
           <span>Titik bernomor menunjukkan urutan rute singgah pangkalan yang telah dioptimasi secara otomatis.</span>
         </div>

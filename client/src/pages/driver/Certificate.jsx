@@ -5,10 +5,11 @@ import { apiForm, uploadUrl } from '../../api';
 import { notifyDataChanged } from '../../events';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
+import { fmtSubmit } from '../../utils';
 
 export default function DriverCertificate() {
   const { user } = useAuth();
-  const { data, reload } = useApi(`/driver/${user.id}/profile`);
+  const { data, error: loadError, reload } = useApi(`/driver/${user.id}/profile`);
   const formRef = useRef(null);
   const submittingRef = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -40,6 +41,7 @@ export default function DriverCertificate() {
   };
 
   if (!data) {
+    if (loadError) return <div className="banner bad" role="alert">{loadError.message}<button className="btn btn-outline" onClick={reload}>Coba Lagi</button></div>;
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -85,6 +87,7 @@ export default function DriverCertificate() {
       )}
 
       <div className="card max-w-640">
+        <p className="muted">Jam submit sertifikat: {fmtSubmit(s.sertifikat_submitted_at)}</p>
         <div className="cert-status-header">
           <div>
             <span className="muted block text-sm">Masa Berlaku K3:</span>

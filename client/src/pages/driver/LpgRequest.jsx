@@ -12,8 +12,8 @@ export default function DriverLpgRequest() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const submittingRef = useRef(false);
-  const { data, reload } = useApi(`/driver/${user.id}/summary`, { interval: 5000 });
-  const { data: kendaraanData } = useApi('/kendaraan');
+  const { data, error: loadError, reload } = useApi(`/driver/${user.id}/summary`, { interval: 5000 });
+  const { data: kendaraanData, error: vehicleError, reload: reloadVehicles } = useApi('/kendaraan');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ kendaraan_id: '', jumlah_diminta: '', catatan: '' });
   const [busy, setBusy] = useState(false);
@@ -59,7 +59,8 @@ export default function DriverLpgRequest() {
     }
   };
 
-  if (!data) {
+  if (!data || !kendaraanData) {
+    if (loadError || vehicleError) return <div className="banner bad" role="alert">{(loadError || vehicleError).message}<button className="btn btn-outline" onClick={() => { reload(); reloadVehicles(); }}>Coba Lagi</button></div>;
     return (
       <div className="card loading-card">
         <div className="spinner" />

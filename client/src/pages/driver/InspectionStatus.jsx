@@ -1,7 +1,8 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { Link } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
-import { fmtWaktu } from '../../utils';
+import { fmtSubmit } from '../../utils';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
 
@@ -9,7 +10,7 @@ export default function DriverInspectionStatus() {
   const { user } = useAuth();
   const { data, loading, error, reload } = useApi(`/driver/${user.id}/summary`, { interval: 5000 });
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -18,7 +19,7 @@ export default function DriverInspectionStatus() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -38,6 +39,7 @@ export default function DriverInspectionStatus() {
 
   return (
     <div className="status-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">
@@ -90,7 +92,7 @@ export default function DriverInspectionStatus() {
             <div className="meta-list mt">
               <div className="meta-item">
                 <span className="meta-label">Waktu Pengajuan:</span>
-                <span className="meta-val">{fmtWaktu(ins.created_at)} WIB</span>
+                <span className="meta-val">{fmtSubmit(ins.created_at)}</span>
               </div>
               <div className="meta-item">
                 <span className="meta-label">Item Lolos:</span>
@@ -101,7 +103,7 @@ export default function DriverInspectionStatus() {
               {ins.validasi_oleh && (
                 <div className="meta-item">
                   <span className="meta-label">Divalidasi Oleh:</span>
-                  <span className="meta-val">{ins.validasi_oleh} ({fmtWaktu(ins.validasi_waktu)} WIB)</span>
+                  <span className="meta-val">{ins.validasi_oleh} ({fmtSubmit(ins.validasi_waktu)})</span>
                 </div>
               )}
             </div>

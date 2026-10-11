@@ -23,24 +23,20 @@ app.get('/api/kendaraan', async (req, res) => {
 app.get('/api/tracking', async (req, res) => {
   try {
     const rows = await queryAll(`
-      SELECT l.*, s.nama, s.nomor_hp FROM lokasi_sopir l JOIN sopir s ON s.id = l.sopir_id
-      WHERE (?::int IS NULL OR l.sopir_id = ?) ORDER BY s.nama
-    `, [req.user.role === 'driver' ? req.user.id : null, req.user.role === 'driver' ? req.user.id : null]);
+      SELECT s.id AS sopir_id, s.nama, s.nomor_hp, l.latitude, l.longitude, l.accuracy, l.updated_at,
+        (l.updated_at > now() - interval '120 seconds') AS active, k.plat_nomor,
+        (SELECT max(created_at) FROM driver_login_reports WHERE sopir_id = s.id) AS login_at
+      FROM sopir s LEFT JOIN lokasi_sopir l ON l.sopir_id = s.id
+      LEFT JOIN LATERAL (SELECT kendaraan_id FROM inspeksi_pagi WHERE sopir_id = s.id AND tanggal = ? LIMIT 1) i ON true
+      LEFT JOIN kendaraan k ON k.id = i.kendaraan_id
+      WHERE (?::int IS NULL OR s.id = ?) ORDER BY s.nama
+    `, [formatDate(), req.user.role === 'driver' ? req.user.id : null, req.user.role === 'driver' ? req.user.id : null]);
     const routes = await queryAll(`
       SELECT sopir_id, urutan, latitude, longitude, pangkalan_nama FROM rute_harian WHERE tanggal = ? ORDER BY sopir_id, urutan
     `, [formatDate()]);
-    const now = Date.now();
     const routeMap = new Map();
     routes.forEach((r) => { if (!routeMap.has(r.sopir_id)) routeMap.set(r.sopir_id, []); routeMap.get(r.sopir_id).push(r); });
-    res.json(rows
-      .filter((row) => {
-        if (row.updated_at) {
-          const updated = new Date(row.updated_at).getTime();
-          return (now - updated) <= 35000;
-        }
-        return false;
-      })
-      .map((row) => ({ ...row, route: routeMap.get(row.sopir_id) || [] })));
+    res.json(rows.map((row) => ({ ...row, active: Boolean(row.active), route: routeMap.get(row.sopir_id) || [] })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Lokasi gagal dibaca' });
@@ -71,7 +67,7 @@ app.get('/api/driver/:id/summary', async (req, res) => {
   const id = Number(req.params.id);
   const today = formatDate();
   try {
-    const sopir = await queryOne('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, nomor_hp FROM sopir WHERE id = ?', [id]);
+    const sopir = await queryOne('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, sertifikat_submitted_at, nomor_hp FROM sopir WHERE id = ?', [id]);
     if (!sopir) return res.status(404).json({ error: 'Sopir tidak ditemukan' });
     const inspection = await queryOne('SELECT * FROM inspeksi_pagi WHERE sopir_id = ? AND tanggal = ? ORDER BY created_at DESC LIMIT 1', [id, today]);
     const lpg = await queryOne('SELECT * FROM permintaan_lpg WHERE sopir_id = ? AND tanggal = ? ORDER BY created_at DESC LIMIT 1', [id, today]);
@@ -87,7 +83,7 @@ app.get('/api/driver/:id/summary', async (req, res) => {
 
 app.get('/api/driver/:id/profile', async (req, res) => {
   try {
-    const sopir = await queryOne('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, nomor_hp FROM sopir WHERE id = ?', [Number(req.params.id)]);
+    const sopir = await queryOne('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, sertifikat_submitted_at, nomor_hp FROM sopir WHERE id = ?', [Number(req.params.id)]);
     if (!sopir) return res.status(404).json({ error: 'Sopir tidak ditemukan' });
     res.json({ sopir });
   } catch (err) { res.status(500).json({ error: 'Gagal membaca profil.' }); }
@@ -127,8 +123,8 @@ app.post('/api/driver/inspection', upload.fields(
     for (const section of CHECKLIST_SECTIONS) {
       const fotoFile = files[`foto_section_${section.id}`]?.[0];
       const videoFile = files[`video_section_${section.id}`]?.[0];
-      const foto = fotoFile ? await saveUploadedFile(fotoFile) : null;
-      const video = videoFile ? await saveUploadedFile(videoFile) : null;
+      const foto = fotoFile ? await saveUploadedFile(fotoFile, req.user) : null;
+      const video = videoFile ? await saveUploadedFile(videoFile, req.user) : null;
       lampiran.push({
         section: section.id,
         sectionNama: section.nama,
@@ -181,15 +177,15 @@ app.post('/api/driver/delivery', upload.fields([
   const body = req.body;
   const files = req.files || {};
   try {
-    const fotoSebelum = files['foto_sebelum']?.[0] ? await saveUploadedFile(files['foto_sebelum'][0]) : null;
-    const fotoProses = files['foto_proses']?.[0] ? await saveUploadedFile(files['foto_proses'][0]) : null;
-    const fotoSesudah = files['foto_sesudah']?.[0] ? await saveUploadedFile(files['foto_sesudah'][0]) : null;
+    const fotoSebelum = files['foto_sebelum']?.[0] ? await saveUploadedFile(files['foto_sebelum'][0], req.user) : null;
+    const fotoProses = files['foto_proses']?.[0] ? await saveUploadedFile(files['foto_proses'][0], req.user) : null;
+    const fotoSesudah = files['foto_sesudah']?.[0] ? await saveUploadedFile(files['foto_sesudah'][0], req.user) : null;
     await run(`
       INSERT INTO pengiriman (
         tanggal, sopir_id, kendaraan_id, pangkalan_nama, latitude, longitude,
         jumlah_dikirim_kg, penerima_nama, penerima_hp, waktu_tiba, waktu_selesai,
         kondisi_pengiriman, foto_sebelum, foto_proses, foto_sesudah, catatan
-      ) VALUES (date('now'), ?, ?, ?, ?, ?, ?, ?, ?, time('now'), time(datetime('now', '+30 minutes')), ?, ?, ?, ?, ?)
+      ) VALUES (date('now'), ?, ?, ?, ?, ?, ?, ?, ?, time('now'), time('now'), ?, ?, ?, ?, ?)
     `, [
       body.sopir_id, req.assignment.kendaraan_id, body.pangkalan_nama || '-', req.assignment.latitude, req.assignment.longitude,
       safeNumber(body.jumlah_dikirim_tabung), body.penerima_nama || '-', body.penerima_hp || '-',
@@ -205,7 +201,7 @@ app.post('/api/driver/delivery', upload.fields([
 app.post('/api/driver/hazard', upload.single('foto_bukti'), async (req, res) => {
   const { sopir_id, jenis_bahaya, deskripsi, latitude, longitude } = req.body;
   try {
-    const fotoBukti = req.file ? await saveUploadedFile(req.file) : null;
+    const fotoBukti = req.file ? await saveUploadedFile(req.file, req.user) : null;
     await run(`
       INSERT INTO laporan_bahaya (tanggal, sopir_id, kendaraan_id, latitude, longitude, jenis_bahaya, deskripsi, foto_bukti, status)
       VALUES (date('now'), ?, ?, ?, ?, ?, ?, ?, 'PENDING')
@@ -220,8 +216,8 @@ app.post('/api/driver/hazard', upload.single('foto_bukti'), async (req, res) => 
 app.post('/api/driver/:id/certificate', upload.single('sertifikat_k3'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File sertifikat tidak ditemukan.' });
   try {
-    const filename = await saveUploadedFile(req.file);
-    await run('UPDATE sopir SET sertifikat_k3 = ? WHERE id = ?', [filename, Number(req.params.id)]);
+    const filename = await saveUploadedFile(req.file, req.user);
+    await run('UPDATE sopir SET sertifikat_k3 = ?, sertifikat_submitted_at = now() WHERE id = ?', [filename, Number(req.params.id)]);
     res.json({ ok: true, filename });
   } catch (err) {
     res.status(500).json({ error: 'Gagal menyimpan sertifikat.' });
@@ -242,7 +238,7 @@ app.get('/api/manager/summary', async (req, res) => {
       queryAll(`SELECT * FROM kpi_sopir WHERE tanggal = ? ORDER BY sopir_id`, [date]),
       queryOne(`SELECT jumlah FROM persediaan_lpg WHERE id = 1`),
       queryAll(`SELECT r.*, s.nama AS sopir_nama, k.plat_nomor FROM permintaan_lpg r JOIN sopir s ON r.sopir_id = s.id JOIN kendaraan k ON r.kendaraan_id = k.id WHERE r.tanggal = ? ORDER BY r.created_at DESC`, [date]),
-      queryAll('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, nomor_hp FROM sopir ORDER BY nama')
+      queryAll('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, sertifikat_submitted_at, nomor_hp FROM sopir ORDER BY nama')
     ]);
 
     const inspeksi = inspeksiRows.map((i) => { const c = countLolos(i); return { ...i, lolos: c.lolos, total: c.total, tidakBaik: c.tidakBaik, belumDicentang: c.belumDicentang }; });
@@ -255,7 +251,7 @@ app.get('/api/manager/summary', async (req, res) => {
     const currentPositions = positions.filter((p) => {
       if (p.updated_at) {
         const updated = new Date(p.updated_at).getTime();
-        return (now - updated) <= 35000;
+        return (now - updated) <= 120000;
       }
       return false;
     });
@@ -352,7 +348,7 @@ app.post('/api/manager/kpi', async (req, res) => {
 app.get('/api/manager/kpi/recommendations', async (req, res) => {
   const date = req.query.date || formatDate();
   try {
-    const semuaSopir = await queryAll('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, nomor_hp FROM sopir ORDER BY nama');
+    const semuaSopir = await queryAll('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, sertifikat_submitted_at, nomor_hp FROM sopir ORDER BY nama');
     const [inspeksiRows, pengirimanRows, ruteRows, bahayaRows] = await Promise.all([
       queryAll('SELECT * FROM inspeksi_pagi WHERE tanggal = ?', [date]),
       queryAll('SELECT * FROM pengiriman WHERE tanggal = ?', [date]),
@@ -429,7 +425,7 @@ app.get('/api/manager/export.xlsx', async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return res.status(400).send('Tanggal laporan tidak valid');
 
   try {
-    const [inspeksi, pengiriman, permintaanLpg, laporanBahaya, kpi, rute, posisi, stok, sopir] = await Promise.all([
+    const [inspeksi, pengiriman, permintaanLpg, laporanBahaya, kpi, rute, posisi, stok, sopir, logins, fatigue] = await Promise.all([
       queryAll(`SELECT i.*, s.nama AS sopir_nama, k.plat_nomor FROM inspeksi_pagi i JOIN sopir s ON s.id=i.sopir_id JOIN kendaraan k ON k.id=i.kendaraan_id WHERE i.tanggal=? ORDER BY i.created_at`, [tanggal]),
       queryAll(`SELECT p.*, s.nama AS sopir_nama, k.plat_nomor FROM pengiriman p JOIN sopir s ON s.id=p.sopir_id LEFT JOIN kendaraan k ON k.id=p.kendaraan_id WHERE p.tanggal=? ORDER BY p.created_at`, [tanggal]),
       queryAll(`SELECT r.*, s.nama AS sopir_nama, k.plat_nomor FROM permintaan_lpg r JOIN sopir s ON s.id=r.sopir_id LEFT JOIN kendaraan k ON k.id=r.kendaraan_id WHERE r.tanggal=? ORDER BY r.created_at`, [tanggal]),
@@ -438,7 +434,13 @@ app.get('/api/manager/export.xlsx', async (req, res) => {
       queryAll(`SELECT r.*, s.nama AS sopir_nama, k.plat_nomor FROM rute_harian r JOIN sopir s ON s.id=r.sopir_id LEFT JOIN kendaraan k ON k.id=r.kendaraan_id WHERE r.tanggal=? ORDER BY r.sopir_id,r.urutan`, [tanggal]),
       queryAll(`SELECT l.*,s.nama AS sopir_nama,k.plat_nomor FROM lokasi_sopir l JOIN sopir s ON s.id=l.sopir_id LEFT JOIN kendaraan k ON k.id=CASE l.sopir_id WHEN 1 THEN 1 WHEN 2 THEN 2 END ORDER BY s.nama`),
       queryAll(`SELECT jumlah,updated_at FROM persediaan_lpg WHERE id=1`),
-      queryAll(`SELECT id,nama,username,nomor_hp,lisensi_expiry,k3_expiry FROM sopir ORDER BY nama`)
+      queryAll(`SELECT id,nama,username,nomor_hp,lisensi_expiry,k3_expiry,sertifikat_submitted_at FROM sopir ORDER BY nama`),
+      queryAll(`SELECT l.*, s.nama FROM driver_login_reports l JOIN sopir s ON s.id = l.sopir_id
+        WHERE l.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
+        AND l.created_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar') ORDER BY l.created_at`, [tanggal, tanggal]),
+      queryAll(`SELECT f.*, s.nama FROM fatigue_reports f JOIN sopir s ON s.id = f.sopir_id
+        WHERE f.captured_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
+        AND f.captured_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar') ORDER BY f.captured_at`, [tanggal, tanggal])
     ]);
 
     const lolos = inspeksi.filter((i) => i.status_validasi === 'AMAN').length;
@@ -476,7 +478,7 @@ app.get('/api/manager/export.xlsx', async (req, res) => {
       ['Dibuat pada', formatWaktuLengkap(new Date().toISOString())]
     ]);
 
-    setupSheet('Inspeksi Pagi', ['ID', 'Sopir', 'Kendaraan', 'Tanggal', 'Status Manager', 'Baik', 'Tidak Baik', 'Belum Dicentang', 'Waktu Submit WIB', 'Catatan'], inspeksi.map((item) => {
+    setupSheet('Inspeksi Pagi', ['ID', 'Sopir', 'Kendaraan', 'Tanggal', 'Status Manager', 'Baik', 'Tidak Baik', 'Belum Dicentang', 'Waktu Submit WITA', 'Catatan'], inspeksi.map((item) => {
       const counts = countLolos(item);
       return [item.id, item.sopir_nama, item.plat_nomor, item.tanggal, item.status_validasi, counts.lolos, counts.tidakBaik, counts.belumDicentang, formatWaktu(item.created_at), item.catatan || ''];
     }));
@@ -492,13 +494,16 @@ app.get('/api/manager/export.xlsx', async (req, res) => {
     });
     setupSheet('Rincian Checklist', ['ID Inspeksi', 'Sopir', 'Kendaraan', 'No Bagian', 'Bagian', 'Item Pemeriksaan', 'Status Sopir', 'Keterangan Sopir', 'File Foto', 'File Video'], checklistRows);
 
-    setupSheet('Pengiriman', ['ID', 'Sopir', 'Kendaraan', 'Pangkalan', 'Jumlah (tabung)', 'Penerima', 'No. HP Penerima', 'Kondisi', 'Waktu Tiba', 'Waktu Selesai', 'Catatan'], pengiriman.map((item) => [item.id, item.sopir_nama, item.plat_nomor || '', item.pangkalan_nama || '', item.jumlah_dikirim_kg || 0, item.penerima_nama || '', item.penerima_hp || '', item.kondisi_pengiriman || '', item.waktu_tiba || '', item.waktu_selesai || '', item.catatan || '']));
-    setupSheet('Permintaan LPG', ['ID', 'Sopir', 'Kendaraan', 'Jumlah (tabung)', 'Status', 'Catatan', 'Diajukan WIB', 'Disetujui Oleh', 'Waktu Persetujuan'], permintaanLpg.map((item) => [item.id, item.sopir_nama, item.plat_nomor || '', item.jumlah_diminta, item.status, item.catatan || '', formatWaktu(item.created_at), item.disetujui_oleh || '', formatWaktu(item.waktu_disetujui)]));
-    setupSheet('Laporan Bahaya', ['ID', 'Sopir', 'Tanggal', 'Jenis Bahaya', 'Deskripsi', 'Latitude', 'Longitude', 'Status', 'Tanggapan Admin', 'Waktu Lapor WIB'], laporanBahaya.map((item) => [item.id, item.sopir_nama, item.tanggal, item.jenis_bahaya || '', item.deskripsi || '', item.latitude, item.longitude, item.status || '', item.admin_response || '', formatWaktu(item.created_at)]));
-    setupSheet('KPI Sopir', ['Tanggal', 'Sopir', 'Nilai (%)', 'Catatan', 'Input Oleh', 'Waktu Input WIB'], kpi.map((item) => [item.tanggal, item.sopir_nama, item.nilai, item.catatan || '', item.input_by || '', formatWaktu(item.created_at)]));
+    setupSheet('Pengiriman', ['ID', 'Sopir', 'Kendaraan', 'Pangkalan', 'Jumlah (tabung)', 'Penerima', 'No. HP Penerima', 'Kondisi', 'Waktu Tiba', 'Waktu Selesai', 'Catatan', 'Jam Submit WITA'], pengiriman.map((item) => [item.id, item.sopir_nama, item.plat_nomor || '', item.pangkalan_nama || '', item.jumlah_dikirim_kg || 0, item.penerima_nama || '', item.penerima_hp || '', item.kondisi_pengiriman || '', item.waktu_tiba || '', item.waktu_selesai || '', item.catatan || '', formatWaktuLengkap(item.created_at)]));
+    setupSheet('Permintaan LPG', ['ID', 'Sopir', 'Kendaraan', 'Jumlah (tabung)', 'Status', 'Catatan', 'Diajukan WITA', 'Disetujui Oleh', 'Waktu Persetujuan'], permintaanLpg.map((item) => [item.id, item.sopir_nama, item.plat_nomor || '', item.jumlah_diminta, item.status, item.catatan || '', formatWaktu(item.created_at), item.disetujui_oleh || '', formatWaktu(item.waktu_disetujui)]));
+    setupSheet('Laporan Bahaya', ['ID', 'Sopir', 'Tanggal', 'Jenis Bahaya', 'Deskripsi', 'Latitude', 'Longitude', 'Status', 'Tanggapan Admin', 'Waktu Lapor WITA'], laporanBahaya.map((item) => [item.id, item.sopir_nama, item.tanggal, item.jenis_bahaya || '', item.deskripsi || '', item.latitude, item.longitude, item.status || '', item.admin_response || '', formatWaktu(item.created_at)]));
+    setupSheet('KPI Sopir', ['Tanggal', 'Sopir', 'Nilai (%)', 'Catatan', 'Input Oleh', 'Waktu Input WITA'], kpi.map((item) => [item.tanggal, item.sopir_nama, item.nilai, item.catatan || '', item.input_by || '', formatWaktu(item.created_at)]));
     setupSheet('Rute Harian', ['Tanggal', 'Sopir', 'Kendaraan', 'Urutan', 'Pangkalan', 'Latitude', 'Longitude', 'Permintaan Ton', 'Estimasi Tiba'], rute.map((item) => [item.tanggal, item.sopir_nama, item.plat_nomor || '', item.urutan, item.pangkalan_nama, item.latitude, item.longitude, item.permintaan_ton, item.estimasi_waktu_tiba]));
-    setupSheet('Posisi GPS', ['Sopir', 'Kendaraan', 'Latitude', 'Longitude', 'Akurasi (m)', 'Terakhir Diperbarui WIB', 'Status'], posisi.map((item) => [item.sopir_nama, item.plat_nomor || '', item.latitude, item.longitude, item.accuracy || '', formatWaktu(item.updated_at), Date.now() - new Date(item.updated_at).getTime() <= 35000 ? 'Aktif' : 'Tidak aktif']));
-    setupSheet('Data Sopir', ['ID', 'Nama', 'Username', 'Nomor HP', 'Lisensi Berlaku Sampai', 'K3 Berlaku Sampai'], sopir.map((item) => [item.id, item.nama, item.username, item.nomor_hp || '', item.lisensi_expiry || '', item.k3_expiry || '']));
+    setupSheet('Posisi GPS', ['Sopir', 'Kendaraan', 'Latitude', 'Longitude', 'Akurasi (m)', 'Terakhir Diperbarui WITA', 'Status'], posisi.map((item) => [item.sopir_nama, item.plat_nomor || '', item.latitude, item.longitude, item.accuracy || '', formatWaktu(item.updated_at), Date.now() - new Date(item.updated_at).getTime() <= 120000 ? 'Aktif' : 'Tidak aktif']));
+    setupSheet('Data Sopir', ['ID', 'Nama', 'Username', 'Nomor HP', 'Lisensi Berlaku Sampai', 'K3 Berlaku Sampai', 'Jam Submit Sertifikat WITA'], sopir.map((item) => [item.id, item.nama, item.username, item.nomor_hp || '', item.lisensi_expiry || '', item.k3_expiry || '', formatWaktuLengkap(item.sertifikat_submitted_at)]));
+
+    setupSheet('Login Sopir', ['Sopir', 'Jam Login Submit WITA'], logins.map(item => [item.nama, formatWaktuLengkap(item.created_at)]));
+    setupSheet('Fatigue Sopir', ['ID', 'Sopir', 'Mode', 'Durasi (detik)', 'Jam Rekam WITA', 'Jam Submit WITA', 'Status Review', 'Catatan Manager', 'Ditinjau Oleh', 'Jam Review WITA', 'File Foto', 'File Video'], fatigue.map(item => [item.id, item.nama, item.kind, item.duration_seconds, formatWaktuLengkap(item.captured_at), formatWaktuLengkap(item.created_at), item.status, item.review_note || '', item.reviewed_by || '', formatWaktuLengkap(item.reviewed_at), item.foto || '', item.video || '']));
 
     const buffer = await workbook.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

@@ -2,8 +2,9 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { useState } from 'react';
 import { useApi } from '../../hooks';
 import { downloadExport } from '../../api';
-import { todayWIB } from '../../utils';
+import { todayWITA } from '../../utils';
 import Icon from '../../components/Icon';
+import ActivityReports from '../../components/ActivityReports';
 
 export default function ManagerOverview() {
   const { date, setDate } = useOutletContext();
@@ -16,7 +17,7 @@ export default function ManagerOverview() {
     finally { setExporting(false); }
   };
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -25,7 +26,7 @@ export default function ManagerOverview() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -67,6 +68,7 @@ export default function ManagerOverview() {
       </div>
 
       {exportError && <div className="banner bad mb" role="alert">{exportError}</div>}
+      {error && data && <div className="banner warn mb" role="alert">Pembaruan gagal. Menampilkan data terakhir. {error.message}</div>}
       {/* Date Filter Strip */}
       <div className="card filter-card mb">
         <div className="filter-inner-row">
@@ -85,8 +87,8 @@ export default function ManagerOverview() {
           <div className="quick-date-buttons">
             <button
               type="button"
-              className={`btn btn-sm ${date === todayWIB() ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setDate(todayWIB())}
+              className={`btn btn-sm ${date === todayWITA() ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setDate(todayWITA())}
             >
               Hari Ini
             </button>
@@ -228,6 +230,7 @@ export default function ManagerOverview() {
         </Link>
       </div>
 
+      <ActivityReports date={date} compact />
       {/* Charts & Breakdown */}
       <div className="grid cols-2 mt">
         <div className="card">

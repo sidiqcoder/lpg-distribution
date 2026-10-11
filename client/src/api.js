@@ -80,16 +80,27 @@ export function apiJson(path, body, method = 'POST') {
 export async function apiForm(path, formData, method = 'POST') {
   const totalBytes = [...formData.values()].reduce((sum, file) => sum + (file instanceof File ? file.size : 0), 0);
   for (const [field, file] of [...formData.entries()]) {
-    if (file instanceof File && file.size > 0 && (file.size > 16 * 1024 * 1024 || totalBytes > 16 * 1024 * 1024)) {
-      const plan = await apiJson('/files/plan', { originalname: file.name, size: file.size, type: file.type });
-      for (let index = 0; index < plan.count; index++) {
-        const part = file.slice(index * plan.partBytes, Math.min(file.size, (index + 1) * plan.partBytes));
-        const result = await request(buildUrl(`/files/part/${encodeURIComponent(plan.filename)}/${index}`), {
-          method: 'PUT', headers: headers({ 'Content-Type': 'application/octet-stream' }), body: part
-        }, 3);
-        await handle(result, '/files/part');
+    if (file instanceof File && file.size > 0 && (/^video\//.test(file.type) || file.size > 16 * 1024 * 1024 || totalBytes > 16 * 1024 * 1024)) {
+      const plan = await apiJson('/files/plan', { originalname: file.name, size: file.size, type: file.type, chunked: totalBytes > 16 * 1024 * 1024,
+        ...(path === '/driver/fatigue' ? { purpose: 'fatigue', captureId: formData.get('capture_id') } : {}) });
+      if (plan.inline) continue;
+      if (!plan.ready) {
+        if (plan.provider === 'r2') {
+          // Only R2's signed headers go to R2. Never forward app session/API keys.
+          const result = await request(plan.uploadUrl, { method: 'PUT', headers: plan.headers, body: file }, 3);
+          await result.body?.cancel();
+          if (!result.ok) throw new Error('Video gagal diunggah. Periksa koneksi lalu coba lagi.');
+        } else {
+          for (let index = 0; index < plan.count; index++) {
+            const part = file.slice(index * plan.partBytes, Math.min(file.size, (index + 1) * plan.partBytes));
+            const result = await request(buildUrl(`/files/part/${encodeURIComponent(plan.filename)}/${index}`), {
+              method: 'PUT', headers: headers({ 'Content-Type': 'application/octet-stream' }), body: part
+            }, 3);
+            await handle(result, '/files/part');
+          }
+        }
+        await apiJson('/files/finish', { filename: plan.filename });
       }
-      await apiJson('/files/finish', { filename: plan.filename });
       formData.delete(field);
       formData.set(`uploaded_${field}`, plan.filename);
     }

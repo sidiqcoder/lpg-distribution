@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "npm:@supabase/supabase-js@2.117.3": "2.117.3",
+    "npm:aws4fetch@1.0.20": "1.0.20",
     "npm:exceljs@4.4.0": "4.4.0",
     "npm:postgres@3.4.9": "3.4.9"
   },
@@ -149,6 +150,9 @@
       "dependencies": [
         "possible-typed-array-names"
       ]
+    },
+    "aws4fetch@1.0.20": {
+      "integrity": "sha512-/djoAN709iY65ETD6LKCtyyEI04XIBP5xVvfmNxsEP0uJB5tyaGBztSryRr4HqMStr9R06PisQE7m9zDTXKu6g=="
     },
     "balanced-match@1.0.2": {
       "integrity": "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
@@ -1267,6 +1271,7 @@
   "workspace": {
     "dependencies": [
       "npm:@supabase/supabase-js@2.117.3",
+      "npm:aws4fetch@1.0.20",
       "npm:postgres@3.4.9"
     ]
   }

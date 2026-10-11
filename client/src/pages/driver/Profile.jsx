@@ -1,3 +1,4 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { Link } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
@@ -9,7 +10,7 @@ export default function DriverProfile() {
   const { user } = useAuth();
   const { data, loading, error } = useApi(`/driver/${user.id}/profile`);
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -18,7 +19,7 @@ export default function DriverProfile() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -34,6 +35,7 @@ export default function DriverProfile() {
 
   return (
     <div className="profile-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">

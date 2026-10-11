@@ -16,8 +16,8 @@ export default function DriverInspectionForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const { data: meta } = useApi('/meta');
-  const { data: kendaraanData } = useApi('/kendaraan');
+  const { data: meta, error: metaError, reload: reloadMeta } = useApi('/meta');
+  const { data: kendaraanData, error: vehicleError, reload: reloadVehicles } = useApi('/kendaraan');
 
   const checkAllBaik = () => {
     if (!formRef.current) return;
@@ -52,7 +52,8 @@ export default function DriverInspectionForm() {
     }
   };
 
-  if (!meta) {
+  if (!meta || !kendaraanData) {
+    if (metaError || vehicleError) return <div className="banner bad" role="alert">{(metaError || vehicleError).message}<button className="btn btn-outline" onClick={() => { reloadMeta(); reloadVehicles(); }}>Coba Lagi</button></div>;
     return (
       <div className="card loading-card">
         <div className="spinner" />

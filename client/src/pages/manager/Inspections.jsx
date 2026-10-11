@@ -1,7 +1,8 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
-import { badgeForStatusValidasi, fmtWaktu } from '../../utils';
+import { badgeForStatusValidasi, fmtSubmit } from '../../utils';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
 
@@ -10,7 +11,7 @@ export default function ManagerInspections() {
   const { data, loading, error, reload } = useApi('/manager/summary', { params: { date }, interval: 6000 });
   const [filter, setFilter] = useState('ALL');
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -19,7 +20,7 @@ export default function ManagerInspections() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -41,6 +42,7 @@ export default function ManagerInspections() {
 
   return (
     <div className="inspections-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">
@@ -126,7 +128,7 @@ export default function ManagerInspections() {
                           {i.lolos} / {i.total} Item
                         </strong>
                       </td>
-                      <td>{fmtWaktu(i.created_at)} WIB</td>
+                      <td>{fmtSubmit(i.created_at)}</td>
                       <td>
                         <Link className="btn btn-sm btn-primary" to={`/manager/review/${i.id}`}>
                           <Icon name="eye" size={14} />

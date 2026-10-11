@@ -1,3 +1,4 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useEffect, useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
@@ -5,6 +6,7 @@ import { apiGet, apiJson } from '../../api';
 import { notifyDataChanged } from '../../events';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
+import { fmtSubmit } from '../../utils';
 
 export default function ManagerKpi() {
   const { date } = useOutletContext();
@@ -78,7 +80,7 @@ export default function ManagerKpi() {
     }
   };
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -87,7 +89,7 @@ export default function ManagerKpi() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -113,6 +115,7 @@ export default function ManagerKpi() {
 
   return (
     <div className="kpi-page-layout">
+      <RefreshNotice error={error} />
       {/* Top Header */}
       <div className="page-head">
         <div>
@@ -206,6 +209,7 @@ export default function ManagerKpi() {
                 <div className="kpi-card-head">
                   <div>
                     <h2 className="driver-name-title">{s.nama}</h2>
+                    <small className="muted block">Jam submit penilaian: {fmtSubmit(data.kpiData.find(k => k.sopir_id === s.id)?.created_at)}</small>
                     <span className="muted text-sm">ID: #DRV-00{s.id} &middot; Kendaraan Armada LPG</span>
                   </div>
                   <div className="grade-badge-wrap">

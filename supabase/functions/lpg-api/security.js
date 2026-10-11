@@ -21,7 +21,11 @@ export async function login(database, body) {
   });
   if (!account) throw error(401, 'Username atau password tidak sesuai.');
   const token = crypto.randomUUID() + crypto.randomUUID();
-  await database.unsafe(`INSERT INTO lpg_private.sessions (token_hash, username, expires_at) VALUES ($1, $2, now() + interval '7 days')`, [await digest(token), account.username]);
+  const tokenHash = await digest(token);
+  await database.begin(async tx => {
+    await tx.unsafe(`INSERT INTO lpg_private.sessions (token_hash, username, expires_at) VALUES ($1, $2, now() + interval '7 days')`, [tokenHash, account.username]);
+    if (account.role === 'driver') await tx.unsafe('INSERT INTO driver_login_reports (sopir_id) VALUES ($1)', [account.sopir_id]);
+  });
   await database.unsafe('DELETE FROM lpg_private.sessions WHERE expires_at < now()');
   return { user: { role: account.role, id: account.sopir_id, nama: account.nama }, token };
 }

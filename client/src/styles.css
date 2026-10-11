@@ -2131,3 +2131,15 @@ table.table-hover tr:hover td {
     margin-top: 8px;
   }
 }
+.fatigue-preview { width: 100%; max-width: 400px; max-height: 300px; object-fit: contain; background: #0f172a; border-radius: 10px; }
+.fatigue-report { border-top: 1px solid #e2e8f0; padding: 16px 0; }
+.fatigue-monitor .flex-row { flex-wrap: wrap; }
+.fatigue-monitor select { max-width: 100%; }
+.operational-clock { white-space: nowrap; }
+@media (max-width: 600px) {
+  .app-topbar { padding: 12px 16px; gap: 8px; }
+  .topbar-left { min-width: 0; }
+  .topbar-right { gap: 6px; }
+  .topbar-right .system-pill { display: none; }
+  .operational-clock { font-size: 12px; }
+}

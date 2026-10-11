@@ -6,6 +6,7 @@ uploads/
 node_modules/
 client/node_modules/
 client/tests/
+tests/
 client/test-results/
 client/playwright-report/
 *.db

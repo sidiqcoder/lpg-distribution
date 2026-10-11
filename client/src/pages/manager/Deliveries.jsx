@@ -1,13 +1,15 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
+import { fmtSubmit } from '../../utils';
 
 export default function ManagerDeliveries() {
   const { date } = useOutletContext();
   const { data, loading, error, reload } = useApi('/manager/summary', { params: { date }, interval: 8000 });
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -16,7 +18,7 @@ export default function ManagerDeliveries() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -36,6 +38,7 @@ export default function ManagerDeliveries() {
 
   return (
     <div className="deliveries-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">
@@ -77,7 +80,7 @@ export default function ManagerDeliveries() {
                 <th>Jumlah Muatan</th>
                 <th>Penanggung Jawab Pangkalan</th>
                 <th>Kondisi Tabung</th>
-                <th>Waktu Tiba</th>
+                <th>Jam Submit (WITA)</th>
                 <th>Catatan</th>
               </tr>
             </thead>
@@ -98,7 +101,7 @@ export default function ManagerDeliveries() {
                         {p.kondisi_pengiriman || '-'}
                       </span>
                     </td>
-                    <td>{p.waktu_tiba || '-'} WIB</td>
+                    <td>{fmtSubmit(p.created_at)}</td>
                     <td>{p.catatan || <span className="muted">-</span>}</td>
                   </tr>
                 ))

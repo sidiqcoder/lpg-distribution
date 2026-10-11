@@ -1,6 +1,6 @@
 # Sistem Distribusi LPG — PT Macan Gading
 
-Frontend React/Vite siap di-host sebagai website statis di Vercel. Seluruh API berjalan di Supabase Edge Functions; data operasional disimpan di PostgreSQL Supabase dan lampiran di Storage privat. Frontend lokal terhubung langsung ke project cloud yang sama.
+Frontend React/Vite siap di-host sebagai website statis di Vercel. Seluruh API berjalan di Supabase Edge Functions; data operasional disimpan di PostgreSQL Supabase. Video menggunakan Cloudflare R2 privat setelah dikonfigurasi; foto/PDF dan lampiran lama tetap dapat dibaca dari Supabase Storage. Frontend lokal terhubung langsung ke project cloud yang sama.
 
 Project: [lpg-distribution-app di Supabase](https://supabase.com/dashboard/project/lvrxcxskroskkeifjyry). Region: Singapore. Backend: `supabase/functions/lpg-api/index.ts`. Frontend: `client/src/main.jsx`.
 
@@ -54,6 +54,8 @@ Bucket `lpg-uploads` privat. API mengembalikan URL lampiran bertanda tangan deng
 
 ## Migrasi dan sumber lama
 
+Integrasi video Cloudflare R2 tersedia, termasuk unggahan langsung, verifikasi server, URL menonton sementara, dan alat migrasi dengan pemeriksaan SHA-256. **R2 belum aktif tanpa bucket, secret backend, dan CORS**; instalasi tanpa konfigurasi tetap menggunakan Supabase. Ikuti [panduan Cloudflare R2](docs/cloudflare-r2.md) untuk aktivasi, verifikasi, serta pemindahan/release video lama. Penghapusan otomatis video operasional belum diaktifkan.
+
 690 baris dari 11 tabel SQLite dipindahkan, termasuk 104 riwayat optimasi rute. Data awal persediaan 520 tabung dipertahankan. Semua 219 file yang tersedia di `uploads/` dipindahkan dengan nama logis aslinya, termasuk dua video 72 MB yang disimpan sebagai beberapa objek Storage. Referensi lampiran yang sudah tidak mempunyai file pada sumber lokal tidak dapat dipulihkan oleh migrasi.
 
 Tiga pengiriman lama memiliki `waktu_selesai` berupa `Inval`. Nilai aslinya dipertahankan di `pengiriman.legacy_waktu_json`; kolom TIME yang bersangkutan bernilai NULL. Kolom inspeksi versi lama ikut dipertahankan. Password plaintext hanya ada di sumber SQLite asli dan tidak dipindahkan ke tabel publik Supabase.
@@ -75,3 +77,17 @@ npm test
 Browser test memakai Playwright/Chromium dan backend cloud. Bila belum tersedia, jalankan `npm exec --prefix client -- playwright install chromium`. Test pembacaan mencakup login lama, seluruh halaman sopir/manager, pemulihan sesi, batas akses, unduh Excel, tampilan mobile, dan video besar. Uji video membandingkan byte awal, akhir, dan range yang melintasi dua bagian dengan file sumber. Test penulisan membutuhkan kredensial sopir uji terisolasi di `.local/e2e-credentials.json`; tanpa fixture, test tersebut dilewati. Jangan membuat fixture memakai akun operasional. Pengujian penulisan yang dilakukan saat rebuild memakai akun sementara dan dibersihkan setelahnya.
 
 Screenshot verifikasi serta laporan migrasi lokal disimpan di `.local/`, yang tidak ikut Git/deployment.
+
+## Pelacakan, laporan WITA, dan pemantauan fatigue
+
+Username manager adalah `manager`. Semua jam, filter hari operasional, timestamp laporan, dan ekspor memakai WITA (`Asia/Makassar`). Tanggal bisnis historis tetap dipertahankan; jam submit sertifikat lama yang tidak pernah dicatat ditampilkan sebagai `-`.
+
+GPS berjalan di seluruh dashboard sopir setelah izin lokasi diberikan. Browser meminta posisi baru setiap 15 detik dan mengirim perubahan maksimal sekali per 5 detik. Dashboard manager memperbarui lokasi setiap 5 detik, mencantumkan login terakhir dan jam GPS, serta mempertahankan lokasi terakhir saat pembaruan lebih dari 2 menit. Sopir yang belum memberikan izin GPS tetap terdaftar dengan status menunggu lokasi. Pergeseran dan zoom peta dipertahankan saat polling; tombol lihat posisi / semua sopir memusatkan peta bila dipilih. Penyimpangan diperiksa terhadap segmen antara pangkalan dengan toleransi 500 meter; GPS dengan akurasi lebih buruk dari 100 meter dan lokasi lama tidak diberi peringatan keluar jalur.
+
+Tombol WhatsApp tersedia pada kartu sopir. Untuk posisi yang keluar jalur, tombol peringatan membuka WhatsApp dengan pesan kembali ke jalur yang sudah terisi. Manager menekan kirim di WhatsApp. Pengiriman tanpa interaksi memerlukan integrasi WhatsApp Business tersendiri.
+
+Sopir dapat mengaktifkan pemantauan kamera depan dari dashboard, memilih foto atau video 7 detik, lalu memberikan izin kamera. Rekaman pertama diambil saat aktivasi jika sudah jatuh tempo; berikutnya setiap 30 menit. Perangkat yang tidak mendukung perekaman video memakai foto. Monitoring tetap berjalan saat berpindah menu sopir. Setelah reload atau login baru, sopir mengaktifkan kamera kembali; jadwal terakhir dipulihkan dari server. Perekaman memerlukan HTTPS dan aplikasi aktif; browser/OS dapat menghentikan kamera serta GPS saat layar terkunci. Jadwal yang terlewat dilanjutkan saat aplikasi kembali aktif, tanpa membuat rekaman palsu untuk interval yang terlewat.
+
+Satu rekaman yang belum terkirim disimpan di IndexedDB perangkat dan dicoba ulang saat koneksi tersedia. Capture ID menjaga retry agar tidak mencatat laporan ganda. Rekaman masuk ke Storage privat dan halaman `/manager/aktivitas`, dengan jam rekam, jam submit aktual, status kamera, dan hasil peninjauan manager. Manager memberi penilaian **Fit** atau **Perlu Istirahat** beserta catatan. Penilaian dilakukan manager berdasarkan rekaman; belum ada model pendeteksi fatigue otomatis. Laporan login dan fatigue turut masuk ke Excel. Histori login berasal dari login berhasil setelah fitur diterapkan dan sesi lama yang masih tersedia saat migrasi.
+
+`npm test` mencakup regression test backend, mock browser untuk dua perangkat, peta, gangguan koneksi, antrean rekaman, jadwal 30 menit, video 7 detik, dan WITA, serta test cloud yang tersedia. Uji penulisan kamera ke cloud memakai fixture sementara terpisah di `.local/monitoring-credentials.json`; tanpa fixture, test tersebut dilewati. Kredensial, akun, laporan, dan objek Storage sementara dibersihkan setelah verifikasi. Frontend perlu di-deploy ulang ke Vercel agar perubahan UI muncul pada website publik.

@@ -1,9 +1,10 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useMemo, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import { apiJson, uploadUrl } from '../../api';
 import { notifyDataChanged } from '../../events';
-import { fmtWaktu } from '../../utils';
+import { fmtSubmit } from '../../utils';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
 
@@ -27,7 +28,7 @@ export default function ManagerReview() {
     return [...map.values()];
   }, [data]);
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -36,7 +37,7 @@ export default function ManagerReview() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -82,6 +83,7 @@ export default function ManagerReview() {
 
   return (
     <div className="review-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">
@@ -89,7 +91,7 @@ export default function ManagerReview() {
           </div>
           <h1>Verifikasi &amp; Validasi Inspeksi K3 Kendaraan</h1>
           <p className="subtitle">
-            Sopir: <strong>{row.sopir_nama}</strong> &middot; Plat: <strong>{row.plat_nomor}</strong> &middot; Diajukan: {fmtWaktu(row.created_at)} WIB
+            Sopir: <strong>{row.sopir_nama}</strong> &middot; Plat: <strong>{row.plat_nomor}</strong> &middot; Diajukan: {fmtSubmit(row.created_at)}
           </p>
         </div>
       </div>

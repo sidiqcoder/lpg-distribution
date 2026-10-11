@@ -4,13 +4,12 @@ import { subscribeDataChanges } from './events';
 
 // Ambil data JSON, reaktif terhadap perubahan data global & polling berkala tanpa manual reload
 export function useApi(path, { interval = 0, params, enabled = true } = {}) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(enabled);
-  const [error, setError] = useState(null);
+  const [state, setState] = useState({ data: null, loading: enabled, error: null, resource: '' });
   const mounted = useRef(true);
   const generation = useRef(0);
   const controller = useRef(null);
   const key = JSON.stringify(params || {});
+  const resource = `${path}:${key}`;
 
   const load = useCallback(async () => {
     if (!enabled || (controller.current && !controller.current.signal.aborted)) return;
@@ -19,19 +18,21 @@ export function useApi(path, { interval = 0, params, enabled = true } = {}) {
     controller.current = currentController;
     try {
       const result = await apiGet(path, JSON.parse(key), { signal: currentController.signal });
-      if (mounted.current && generation.current === currentGeneration) { setData(result); setError(null); }
+      if (result == null) throw new Error('Server belum mengembalikan data. Silakan coba lagi.');
+      if (mounted.current && generation.current === currentGeneration) setState({ data: result, loading: false, error: null, resource });
     } catch (err) {
-      if (mounted.current && generation.current === currentGeneration && !currentController.signal.aborted) setError(err);
+      if (mounted.current && generation.current === currentGeneration && !currentController.signal.aborted) {
+        setState(previous => ({ ...previous, loading: false, error: err, resource }));
+      }
     } finally {
       if (controller.current === currentController) controller.current = null;
-      if (mounted.current && generation.current === currentGeneration) setLoading(false);
     }
-  }, [path, key, enabled]);
+  }, [path, key, enabled, resource]);
 
   useEffect(() => {
     mounted.current = true;
     generation.current++;
-    setLoading(enabled);
+    setState(previous => previous.resource === resource ? previous : { data: null, loading: enabled, error: null, resource });
     load();
 
     // 1. Polling berkala jika ada interval
@@ -57,13 +58,15 @@ export function useApi(path, { interval = 0, params, enabled = true } = {}) {
       mounted.current = false;
       generation.current++;
       controller.current?.abort();
+      controller.current = null;
       if (timer) clearInterval(timer);
       unsubscribe();
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [load, interval, enabled]);
 
-  return { data, loading, error, reload: load };
+  const current = state.resource === resource ? state : { data: null, loading: enabled, error: null };
+  return { ...current, stale: Boolean(current.data && current.error), reload: load };
 }
 
 // Sederhana: simpan objek di localStorage dan sinkronkan ke state.

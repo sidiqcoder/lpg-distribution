@@ -11,8 +11,11 @@
     "build:client": "npm --prefix client run build",
     "migrate:prepare": "node scripts/prepare-migration.js",
     "migrate:uploads": "node scripts/migrate-uploads.js",
+    "migrate:videos:r2": "node scripts/migrate-videos-r2.js",
     "check:backend": "deno check --config supabase/functions/lpg-api/deno.json supabase/functions/lpg-api/index.ts",
-    "test": "npm --prefix client run test:e2e"
+    "test:backend": "deno test --config supabase/functions/lpg-api/deno.json supabase/tests/",
+    "test:migration": "node --test tests/r2-migration.test.cjs",
+    "test": "npm run test:backend && npm run test:migration && npm --prefix client run test:e2e"
   },
   "keywords": [],
   "author": "",

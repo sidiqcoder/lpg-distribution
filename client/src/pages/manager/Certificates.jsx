@@ -1,14 +1,16 @@
+import RefreshNotice from '../../components/RefreshNotice';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
 import { uploadUrl } from '../../api';
 import BackButton from '../../components/BackButton';
 import Icon from '../../components/Icon';
+import { fmtSubmit } from '../../utils';
 
 export default function ManagerCertificates() {
   const { date } = useOutletContext();
   const { data, loading, error, reload } = useApi('/manager/summary', { params: { date }, interval: 15000 });
 
-  if (loading && !data) {
+  if (!data && !error) {
     return (
       <div className="card loading-card">
         <div className="spinner" />
@@ -17,7 +19,7 @@ export default function ManagerCertificates() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="banner bad">
         <div className="banner-title">
@@ -34,6 +36,7 @@ export default function ManagerCertificates() {
 
   return (
     <div className="certificates-page-layout">
+      <RefreshNotice error={error} />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">
@@ -66,6 +69,7 @@ export default function ManagerCertificates() {
             </div>
 
             <div className="cert-meta-info mt-sm">
+              <div className="meta-row"><span className="muted">Jam Submit:</span><span>{fmtSubmit(s.sertifikat_submitted_at)}</span></div>
               <div className="meta-row">
                 <span className="muted">Masa Berlaku K3:</span>
                 <strong>{s.k3_expiry || 'Belum Diatur'}</strong>

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import Icon from './Icon';
 import { useAuth } from '../auth';
 import { useApi } from '../hooks';
+import ErrorBoundary from './ErrorBoundary';
+import { fmtWaktu } from '../utils';
 
 const BRAND = {
   name: 'PT MACAN GADING',
@@ -33,6 +35,7 @@ function getNavigationGroups(role) {
         items: [
           { to: '/manager/kpi', label: 'Penilaian KPI Sopir', icon: 'chart' },
           { to: '/manager/bahaya', label: 'Laporan Bahaya / Insiden', icon: 'alert' },
+          { to: '/manager/aktivitas', label: 'Aktivitas & Fatigue Sopir', icon: 'eye' },
           { to: '/manager/sertifikat', label: 'Sertifikat K3 Sopir', icon: 'shield' }
         ]
       }
@@ -80,6 +83,11 @@ export default function Layout({ role, user, title, children }) {
   const location = useLocation();
   const { logout } = useAuth();
   const groups = getNavigationGroups(role);
+  const [clock, setClock] = useState(() => new Date().toISOString());
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date().toISOString()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const connection = useApi('/health', { interval: 30000 });
   const connectionText = connection.error ? 'Koneksi terputus' : connection.data?.ok ? 'Terhubung' : 'Menghubungkan...';
 
@@ -174,6 +182,7 @@ export default function Layout({ role, user, title, children }) {
           </div>
 
           <div className="topbar-right">
+            <span className="operational-clock text-sm" aria-label="Jam operasional WITA">{fmtWaktu(clock)}</span>
             <div className="system-pill">
               <span className={connection.error ? '' : 'pulse-indicator'} />
               <span>{connectionText}</span>
@@ -191,7 +200,7 @@ export default function Layout({ role, user, title, children }) {
           </div>
         </header>
 
-        <main className="page-container">{children}</main>
+        <main className="page-container"><ErrorBoundary key={location.pathname}>{children}</ErrorBoundary></main>
       </div>
     </div>
   );

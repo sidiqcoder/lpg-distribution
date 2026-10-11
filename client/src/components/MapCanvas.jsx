@@ -2,19 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-export default function MapCanvas({ height = 420, center = [-8.17, 113.7], zoom = 12, onReady }) {
+export default function MapCanvas({ height = 420, center = [-8.17, 113.7], zoom = 12, onReady, onInteraction }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const readyRef = useRef(onReady);
+  const initialView = useRef({ center, zoom });
+  const interactionRef = useRef(onInteraction);
   const [mapLoading, setMapLoading] = useState(true);
   readyRef.current = onReady;
+  interactionRef.current = onInteraction;
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center,
-      zoom,
+      center: initialView.current.center,
+      zoom: initialView.current.zoom,
       zoomControl: true,
       fadeAnimation: true,
       markerZoomAnimation: true
@@ -35,6 +38,14 @@ export default function MapCanvas({ height = 420, center = [-8.17, 113.7], zoom 
     });
 
     mapRef.current = map;
+    const interacted = () => { map.lpgUserMoved = true; interactionRef.current?.(); };
+    map.on('dragstart', interacted);
+    const element = containerRef.current;
+    element.addEventListener('wheel', interacted, { passive: true });
+    element.addEventListener('touchstart', interacted, { passive: true });
+    element.addEventListener('mousedown', interacted);
+    const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    observer.observe(element);
 
     // Paksa map menghitung ukuran kontainer secara cepat
     requestAnimationFrame(() => {
@@ -51,10 +62,14 @@ export default function MapCanvas({ height = 420, center = [-8.17, 113.7], zoom 
 
     return () => {
       clearTimeout(timer);
+      observer.disconnect();
+      element.removeEventListener('wheel', interacted);
+      element.removeEventListener('touchstart', interacted);
+      element.removeEventListener('mousedown', interacted);
       map.remove();
       mapRef.current = null;
     };
-  }, [center, zoom]);
+  }, []);
 
   return (
     <div style={{ position: 'relative', width: '100%', height }}>

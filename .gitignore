@@ -14,6 +14,9 @@ client/.env.local
 .local/
 supabase/.temp/
 supabase/.branches/
+supabase/.env
+supabase/.env.local
+supabase/r2-secrets.env
 client/test-results/
 client/playwright-report/
 

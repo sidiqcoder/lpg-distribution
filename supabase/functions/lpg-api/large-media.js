@@ -54,8 +54,9 @@ export function largeMedia(database, supabase, secret, projectUrl) {
   }
 
   async function verifyUpload(user, filename) {
-    const [file] = await database.unsafe('SELECT filename FROM lpg_private.media_files WHERE filename = $1 AND owner = $2 AND ready', [filename, user.username]);
+    const [file] = await database.unsafe('SELECT filename, content_type, total_size FROM lpg_private.media_files WHERE filename = $1 AND owner = $2 AND ready', [filename, user.username]);
     if (!file) throw fail(403, 'Lampiran tidak diizinkan.');
+    return { mimetype: file.content_type, size: Number(file.total_size), provider: 'supabase' };
   }
 
   async function serve(request, filename, headers) {

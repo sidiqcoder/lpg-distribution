@@ -1,12 +1,12 @@
 import { Outlet, useSearchParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../auth';
-import { todayWIB } from '../../utils';
+import { todayWITA } from '../../utils';
 
 export default function ManagerLayout() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
-  const date = params.get('date') || todayWIB();
+  const date = params.get('date') || todayWITA();
   const setDate = (d) => { const p = new URLSearchParams(params); p.set('date', d); setParams(p); };
 
   return (

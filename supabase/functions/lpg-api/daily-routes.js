@@ -31,6 +31,8 @@ export async function ensureDailyRoutes(database, today) {
     value.setUTCDate(value.getUTCDate() + days);
     return value.toISOString().slice(0, 10);
   };
+  const [existing] = await database.unsafe('SELECT count(DISTINCT sopir_id)::int AS count FROM rute_harian WHERE tanggal = $1 AND sopir_id IN (1, 2)', [today]);
+  if (existing.count === 2) return;
   const [first] = await database.unsafe('SELECT min(tanggal)::text AS tanggal FROM rute_harian');
   const oldest = shift(today, -13);
   let date = first?.tanggal && first.tanggal > oldest ? first.tanggal : oldest;
