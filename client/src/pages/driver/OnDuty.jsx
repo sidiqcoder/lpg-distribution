@@ -40,7 +40,7 @@ export default function DriverOnDuty() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !data || !summary?.siapBerangkat) return;
-    const points = rute.map((r) => ({ lat: Number(r.latitude), lng: Number(r.longitude) }));
+    const points = (data.origin ? [data.origin, ...rute] : rute).map((r) => ({ lat: Number(r.latitude), lng: Number(r.longitude) }));
     if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
     if (points.length > 1) {
       lineRef.current = L.polyline(points.map((p) => [p.lat, p.lng]), { color: '#b91c1c', weight: 5, dashArray: '8 8' }).addTo(map);
@@ -52,7 +52,7 @@ export default function DriverOnDuty() {
   useEffect(() => {
     if (!position || !summary?.siapBerangkat) return;
     const { latitude: lat, longitude: lng, accuracy } = position;
-    const distance = distanceToRoute(lat, lng, data?.rute);
+    const distance = distanceToRoute(lat, lng, data?.origin ? [data.origin, ...rute] : rute);
     const off = distance != null && distance > 0.5 && accuracy <= 100;
     const map = mapRef.current;
     if (map) {
@@ -222,7 +222,7 @@ export default function DriverOnDuty() {
                     <div className="route-info-col">
                       <strong>{r.pangkalan_nama}</strong>
                       <span className="muted block text-sm">
-                        Permintaan: {r.permintaan_ton} Ton &middot; Estimasi: {r.estimasi_waktu_tiba || '-'} WITA
+                        {r.permintaan_ton > 0 ? `Permintaan: ${r.permintaan_ton} Ton` : 'Kuota belum ditetapkan'} &middot; {r.estimasi_waktu_tiba ? `Estimasi: ${r.estimasi_waktu_tiba} WITA` : 'Estimasi belum ditetapkan'}
                       </span>
                     </div>
                     <div className="route-status-col">

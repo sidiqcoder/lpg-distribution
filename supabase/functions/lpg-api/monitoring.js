@@ -24,8 +24,9 @@ export function registerMonitoring(app, { database, queryAll, queryOne, upload, 
     const duration = Number(req.body.duration_seconds);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(capture_id || '') ||
       !Number.isFinite(Date.parse(captured_at)) || !/(Z|[+-]\d{2}:\d{2})$/.test(captured_at || '') ||
-      Date.parse(captured_at) > Date.now() + 120000 || !['foto', 'video'].includes(kind) || !Number.isInteger(duration) ||
+      !['foto', 'video'].includes(kind) || !Number.isInteger(duration) ||
       (kind === 'foto' ? duration !== 0 : duration < 5 || duration > 10)) throw fail('Data rekaman tidak valid.');
+    if (Date.parse(captured_at) > Date.now() + 120000) throw Object.assign(fail('Jam rekaman mendahului server. Sinkronkan waktu dan kirim ulang rekaman.'), { code: 'CAPTURE_TIME_AHEAD' });
     const report = await database.begin(async tx => {
       await tx.unsafe('SELECT pg_advisory_xact_lock($1)', [req.user.id]);
       const [existing] = await tx.unsafe('SELECT id, created_at FROM fatigue_reports WHERE sopir_id = $1 AND capture_id = $2', [req.user.id, capture_id]);
@@ -51,8 +52,10 @@ export function registerMonitoring(app, { database, queryAll, queryOne, upload, 
         WHERE l.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
         AND l.created_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar') ORDER BY l.created_at DESC LIMIT 200`, [date, date]),
       queryAll(`SELECT f.*, s.nama FROM fatigue_reports f JOIN sopir s ON s.id = f.sopir_id
-        WHERE f.captured_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
-        AND f.captured_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar') ORDER BY f.captured_at DESC LIMIT 200`, [date, date]),
+        WHERE (f.captured_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
+        AND f.captured_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar'))
+        OR (f.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
+        AND f.created_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar')) ORDER BY f.created_at DESC LIMIT 200`, [date, date, date, date]),
       queryAll(`SELECT s.id AS sopir_id, s.nama, m.camera_enabled, m.camera_error, m.next_capture_at, m.updated_at,
         (m.camera_enabled AND m.updated_at > now() - interval '90 seconds') AS active,
         (SELECT max(captured_at) FROM fatigue_reports WHERE sopir_id = s.id) AS last_capture_at

@@ -32,6 +32,7 @@ async function mock(context, state = {}) {
       }
     }
     else if (path === '/files/finish') { state.r2Ready = true; result = { ok: true }; }
+    else if (path.startsWith('/files/proxy/')) { state.proxyUploads = (state.proxyUploads || 0) + 1; state.r2Ready = true; result = { ok: true }; }
     else if (path === '/health') result = { ok: true };
     else if (path === '/manager/summary') {
       if (state.failSummary) return route.fulfill({ status: 503, json: { error: 'Koneksi uji terputus' } });
@@ -50,21 +51,26 @@ async function mock(context, state = {}) {
     else if (path === '/driver/fatigue') {
       const body = request.postDataBuffer().toString('latin1');
       const field = name => body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]+)`))?.[1];
-      state.uploads.push({ id: field('capture_id'), kind: field('kind'), duration: field('duration_seconds'), size: request.postDataBuffer().length });
+      state.uploads.push({ id: field('capture_id'), capturedAt: field('captured_at'), kind: field('kind'), duration: field('duration_seconds'), size: request.postDataBuffer().length });
+      if (state.rejectMetadata) return route.fulfill({ status: 400, json: { error: 'Data rekaman tidak valid.' } });
       if (state.failUpload) return route.fulfill({ status: 503, json: { error: 'Unggah uji gagal' } });
       const report = { id: state.reports.length + 1, nama: driver.nama, kind: field('kind'), captured_at: field('captured_at'), created_at: timestamp, status: 'MENUNGGU', foto: '', video: '' };
       state.reports.push(report); result = { ok: true, id: report.id, created_at: timestamp };
     } else if (path === '/manager/activity') result = { logins: [{ id: 1, nama: driver.nama, created_at: timestamp }], reports: state.reports, monitoring: [] };
     else if (path === '/driver/1/profile') result = { sopir: driver };
     else if (path === '/driver/1/routes') { state.routeReads = (state.routeReads || 0) + 1; result = { rute: state.route || [], delivered: [] }; }
-    else if (path === '/meta') result = { sections: [], totalItems: 0 };
-    else if (path === '/kendaraan') result = { kendaraan: [] };
-    await route.fulfill({ json: result });
+    else if (path === '/meta') result = { sections: state.sections || [], totalItems: 0 };
+    else if (path === '/kendaraan') result = { kendaraan: state.vehicles || [] };
+    else if (path === '/driver/inspection') {
+      state.inspectionBody = request.postDataBuffer().toString('latin1');
+      state.driverSummary = { inspection: { id: 1, status_validasi: 'MENUNGGU', created_at: timestamp, checklist_json: '[]' } };
+    }
+    await route.fulfill({ json: result, headers: state.serverClock ? { 'X-Server-Time': new Date().toISOString(), 'Access-Control-Expose-Headers': 'X-Server-Time' } : {} });
   });
   if (state.r2) await context.route('https://r2-upload.test/**', async route => {
     state.r2Puts ||= [];
     state.r2Puts.push({ headers: route.request().headers(), size: route.request().postDataBuffer()?.length || 0 });
-    await route.fulfill({ status: 200, body: '', headers: { 'Access-Control-Allow-Origin': '*' } });
+    await route.fulfill({ status: state.directUploadFails ? 503 : 200, body: '', headers: { 'Access-Control-Allow-Origin': '*' } });
   });
   return state;
 }
@@ -229,4 +235,79 @@ test('WITA reports and manager username are consistent regardless of device time
   expect(formatted[0]).toBe('2026-10-11'); expect(formatted[1]).toMatch(/00.30.00 WITA/);
   await page.goto('/admin/login');
   await expect(page.locator('#username')).toHaveAttribute('placeholder', 'manager');
+});
+
+test('camera uses the authenticated fallback when direct R2 upload fails', async ({ page, context }) => {
+  const state = await mock(context, { r2: true, directUploadFails: true }); await session(context, 'driver');
+  await page.goto('/sopir'); await page.getByRole('button', { name: 'Aktifkan Kamera', exact: true }).click();
+  await expect.poll(() => state.reports.length).toBe(1); expect(state.proxyUploads).toBe(1);
+  expect(state.r2Plans[0].captureId).toBe(state.uploads[0].id);
+  expect(state.r2Puts[0].headers.authorization).toBeUndefined();
+  await page.getByRole('button', { name: 'Hentikan Pemantauan' }).click();
+});
+
+test('inspection submit explains missing fields and complete form reaches status page', async ({ page, context }) => {
+  const state = await mock(context, { sections: [{ id: 'A', nama: 'Armada', items: ['Rem berfungsi'] }], vehicles: [{ id: 1, plat_nomor: 'DK UJI', kapasitas_ton: 543, tipe_tangki: 'Truk Engkel' }] });
+  await session(context, 'driver'); await page.goto('/sopir/inspeksi-form');
+  await page.getByRole('button', { name: 'Kirim & Ajukan Inspeksi' }).click();
+  await expect(page.getByRole('alert').last()).toContainText('Pilih kendaraan');
+  await page.locator('#kendaraan_id').selectOption('1');
+  await page.getByRole('button', { name: 'Kirim & Ajukan Inspeksi' }).click();
+  await expect(page.getByRole('alert').last()).toContainText('Rem berfungsi');
+  await page.getByRole('button', { name: 'Set Semua Kondisi BAIK' }).click();
+  await page.getByRole('button', { name: 'Kirim & Ajukan Inspeksi' }).click();
+  await expect(page).toHaveURL(/status-inspeksi/);
+  expect(state.inspectionBody).toContain('status_A_0'); expect(state.inspectionBody).toContain('BAIK');
+  await expect(page.getByText('Gagal Memuat Status')).toHaveCount(0);
+});
+
+test('device clock one hour ahead is corrected for WITA and video capture', async ({ page, context }) => {
+  const state = await mock(context, { serverClock: true }); await session(context, 'driver');
+  await page.clock.install({ time: new Date(Date.now() + 3600000) });
+  await page.goto('/sopir');
+  await page.getByRole('button', { name: 'Aktifkan Kamera', exact: true }).click();
+  await expect.poll(() => state.reports.length).toBe(1);
+  expect(Math.abs(Date.parse(state.uploads[0].capturedAt) - Date.now())).toBeLessThan(60000);
+  const clock = await page.evaluate(async () => { const { serverNow } = await import('/src/clock.js'); return serverNow(); });
+  expect(Math.abs(clock - Date.now())).toBeLessThan(60000);
+  await expect(page.getByText('Izin kamera sudah diberikan.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Hentikan Pemantauan' }).click();
+});
+
+test('old queued capture with a clock ahead is repaired and reaches manager without recapturing', async ({ page, context }) => {
+  const state = await mock(context, { serverClock: true }); await session(context, 'driver');
+  await page.clock.install({ time: new Date(Date.now() + 3600000) }); await page.goto('/sopir');
+  const captureId = await page.evaluate(async () => {
+    const { saveCapture } = await import('/src/fatigue.js'); const id = crypto.randomUUID();
+    await saveCapture(1, { id, capturedAt: new Date().toISOString(), kind: 'foto', duration: 0, blob: new Blob(['saved photo'], { type: 'image/jpeg' }) }); return id;
+  });
+  await page.reload();
+  await expect.poll(() => state.reports.length).toBe(1);
+  expect(state.uploads[0].id).toBe(captureId);
+  expect(Math.abs(Date.parse(state.uploads[0].capturedAt) - Date.now())).toBeLessThan(60000);
+  await expect(page.getByRole('button', { name: 'Aktifkan Kamera', exact: true })).toBeVisible();
+});
+
+test('validation rejection retains recording and explicit retry succeeds without opening camera', async ({ page, context }) => {
+  const state = await mock(context, { rejectMetadata: true }); await session(context, 'driver'); await page.goto('/sopir');
+  await page.getByLabel('Mode kamera fatigue').selectOption('foto'); await page.getByRole('button', { name: 'Aktifkan Kamera', exact: true }).click();
+  await expect(page.getByText(/Laporan belum diterima:/)).toBeVisible(); const id = state.uploads[0].id;
+  await page.getByRole('button', { name: 'Hentikan Pemantauan' }).click(); state.rejectMetadata = false;
+  await page.getByRole('button', { name: 'Kirim Ulang Rekaman' }).click();
+  await expect.poll(() => state.reports.length).toBe(1); expect(state.uploads.at(-1).id).toBe(id);
+});
+
+test('late unauthorized response cannot erase a newer session and logout propagates across tabs', async ({ page, context }) => {
+  await mock(context); await session(context, 'driver'); await page.goto('/sopir');
+  await expect(page.getByRole('heading', { name: 'Ringkasan Operasional Hari Ini' })).toBeVisible();
+  let release; const gate = new Promise(resolve => { release = resolve; }); let started = false;
+  await context.route('**/api/late401', async route => { started = true; await gate; await route.fulfill({ status: 401, json: { error: 'Sesi berakhir.', code: 'SESSION_EXPIRED' } }); });
+  const pending = page.evaluate(async () => { const { apiGet } = await import('/src/api.js'); try { await apiGet('/late401'); } catch (error) { return error.status; } });
+  await expect.poll(() => started).toBe(true);
+  await page.evaluate(() => localStorage.setItem('lpg:session', 'new-driver-session')); release(); expect(await pending).toBe(401);
+  expect(await page.evaluate(() => localStorage.getItem('lpg:session'))).toBe('new-driver-session');
+  const other = await context.newPage(); await other.goto('/sopir');
+  await other.evaluate(() => { localStorage.removeItem('lpg:session'); localStorage.removeItem('lpg:user'); });
+  await expect(page).toHaveURL(/\/login$/);
+  await other.close();
 });

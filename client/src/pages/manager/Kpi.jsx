@@ -336,7 +336,7 @@ export default function ManagerKpi() {
                     <td><strong>1. Inspeksi Pra-Keberangkatan</strong></td>
                     <td><strong>30%</strong></td>
                     <td>
-                      Kelayakan 72 item checklist teknis kendaraan (rem, ban, tangki, alat pemadam APAR).
+                      Kelayakan 72 item checklist teknis kendaraan (rem, ban, bak truk, alat pemadam APAR).
                       Status validasi manager (Aman = 100%, Perbaikan = 50%, Tidak ada = 0%).
                     </td>
                   </tr>

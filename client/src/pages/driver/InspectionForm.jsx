@@ -30,6 +30,15 @@ export default function DriverInspectionForm() {
   const submit = async (e) => {
     e.preventDefault();
     if (submittingRef.current || busy) return;
+    const form = formRef.current;
+    const missing = [...form.querySelectorAll('[required]')].find(input => !input.validity.valid);
+    if (missing) {
+      const item = missing.closest('.checklist-item-row')?.querySelector('.item-text')?.textContent;
+      setError(item ? `Pilih kondisi BAIK atau TIDAK untuk: ${item}.` : 'Pilih kendaraan yang akan diinspeksi terlebih dahulu.');
+      missing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      missing.focus();
+      return;
+    }
 
     submittingRef.current = true;
     setBusy(true);
@@ -90,7 +99,7 @@ export default function DriverInspectionForm() {
       </div>
 
       {error && (
-        <div className="banner bad mb">
+        <div className="banner bad mb" role="alert">
           <div className="banner-title">
             <Icon name="alert" size={18} />
             <span>Pengajuan Gagal Dikirim</span>
@@ -109,7 +118,7 @@ export default function DriverInspectionForm() {
         </div>
       )}
 
-      <form ref={formRef} onSubmit={submit}>
+      <form ref={formRef} onSubmit={submit} noValidate>
         {/* Pilihan Kendaraan */}
         <div className="card mb">
           <div className="card-header-styled">
@@ -117,12 +126,12 @@ export default function DriverInspectionForm() {
             <h2>Identitas Armada Pengangkut LPG</h2>
           </div>
           <div className="form-group mt">
-            <label htmlFor="kendaraan_id">Nomor Polisi / Plat Kendaraan Tangki</label>
+            <label htmlFor="kendaraan_id">Nomor Polisi / Plat Truk Engkel</label>
             <select id="kendaraan_id" name="kendaraan_id" required defaultValue="">
               <option value="">-- Pilih Kendaraan Tugas --</option>
               {kendaraan.map((k) => (
                 <option key={k.id} value={k.id}>
-                  {k.plat_nomor} &mdash; Kapasitas {k.kapasitas_ton} Tabung ({k.tipe_tangki || 'Engkel'})
+                  {k.plat_nomor} &mdash; Kapasitas {k.kapasitas_ton} Tabung (Truk Engkel)
                 </option>
               ))}
             </select>
@@ -224,6 +233,8 @@ export default function DriverInspectionForm() {
           </div>
 
           <div className="form-actions-bar mt">
+            {error && <p className="text-danger" role="alert">{error}</p>}
+            {busy && <p role="status">Mengunggah lampiran dan mengajukan inspeksi. Mohon tunggu...</p>}
             <button
               className="btn btn-primary btn-lg"
               type="submit"

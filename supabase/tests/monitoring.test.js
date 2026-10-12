@@ -5,6 +5,7 @@ import { authorize } from '../functions/lpg-api/security.js';
 import { createRouter, upload } from '../functions/lpg-api/router.js';
 import { registerMonitoring } from '../functions/lpg-api/monitoring.js';
 import { ensureDailyRoutes } from '../functions/lpg-api/daily-routes.js';
+import { PRESCRIBED_ROUTES, ROUTE_ORIGIN } from '../functions/lpg-api/prescribed-routes.js';
 import { distanceToRoute, routeStatus, waLink } from '../../client/src/tracking.js';
 
 Deno.test('attachment signing preserves database timestamps in nested reports', async () => {
@@ -61,8 +62,38 @@ Deno.test('invalid capture metadata and camera state are rejected before databas
   await assert.rejects(() => app.match('POST', '/api/driver/1/monitoring').handler({ user: { id: 1 }, body: { camera_enabled: 'true' } }, {}), { status: 400 });
 });
 
-Deno.test('existing daily assignments skip route backfill and write transactions', async () => {
+Deno.test('historical route assignments are never backfilled with the new PDF', async () => {
   let reads = 0;
   await ensureDailyRoutes({ unsafe: () => { reads++; return Promise.resolve([{ count: 2 }]); } }, '2026-10-11');
-  assert.equal(reads, 1);
+  assert.equal(reads, 0);
+});
+
+Deno.test('PDF routes append after current assignments once, preserve both drivers and document order', async () => {
+  const saved = [];
+  const tx = { unsafe: (sql, args) => {
+    if (sql.startsWith('SELECT s.id')) return Promise.resolve([{ id: 1, username: 'budi', kendaraan_id: 1 }, { id: 2, username: 'ahmad', kendaraan_id: 2 }]);
+    if (sql.startsWith('SELECT urutan')) return Promise.resolve(saved.filter(row => row[1] === args[1]).map(row => ({ urutan: row[3], urutan_dokumen: row[9] })));
+    if (sql.startsWith('SELECT COALESCE')) return Promise.resolve([{ urutan: 5 }]);
+    if (sql.startsWith('INSERT')) saved.push(args);
+    return Promise.resolve([]);
+  } };
+  const database = { begin: fn => fn(tx) };
+  await ensureDailyRoutes(database, '2026-10-12');
+  await ensureDailyRoutes(database, '2026-10-12');
+  assert.equal(saved.length, 22);
+  for (const [index, username] of ['budi', 'ahmad'].entries()) {
+    const rows = saved.filter(row => row[1] === index + 1);
+    assert.deepEqual(rows[0].slice(6, 8), ROUTE_ORIGIN);
+    assert.equal(rows[0][3], 0);
+    assert.deepEqual(rows.slice(1).map(row => row.slice(6, 8)), PRESCRIBED_ROUTES[username]);
+    assert.deepEqual(rows.slice(1).map(row => row[3]), [6,7,8,9,10,11,12,13,14,15]);
+  }
+});
+
+Deno.test('future capture timestamps have a recoverable clock error before storage', async () => {
+  const app = createRouter();
+  registerMonitoring(app, { database: {}, upload });
+  await assert.rejects(() => app.match('POST', '/api/driver/fatigue').handler({ user: { id: 1 }, body: {
+    capture_id: crypto.randomUUID(), captured_at: new Date(Date.now() + 3600000).toISOString(), kind: 'video', duration_seconds: '7'
+  } }, {}), { status: 400, code: 'CAPTURE_TIME_AHEAD' });
 });

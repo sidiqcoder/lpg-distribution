@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import { useApi } from '../hooks';
 import ErrorBoundary from './ErrorBoundary';
 import { fmtWaktu } from '../utils';
+import { serverNow } from '../clock';
 
 const BRAND = {
   name: 'PT MACAN GADING',
@@ -83,9 +84,9 @@ export default function Layout({ role, user, title, children }) {
   const location = useLocation();
   const { logout } = useAuth();
   const groups = getNavigationGroups(role);
-  const [clock, setClock] = useState(() => new Date().toISOString());
+  const [clock, setClock] = useState(() => new Date(serverNow()).toISOString());
   useEffect(() => {
-    const timer = setInterval(() => setClock(new Date().toISOString()), 1000);
+    const timer = setInterval(() => setClock(new Date(serverNow()).toISOString()), 1000);
     return () => clearInterval(timer);
   }, []);
   const connection = useApi('/health', { interval: 30000 });

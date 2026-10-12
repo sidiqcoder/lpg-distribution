@@ -153,14 +153,14 @@ export default function DriverLpgRequest() {
         ) : (
           <form onSubmit={submit} className="mt">
             <div className="form-group">
-              <label htmlFor="kendaraan_id">Kendaraan Tangki Bertugas</label>
+              <label htmlFor="kendaraan_id">Truk Engkel Bertugas</label>
               <select
                 id="kendaraan_id"
                 value={form.kendaraan_id}
                 onChange={(e) => setForm({ ...form, kendaraan_id: e.target.value })}
                 required
               >
-                <option value="">-- Pilih Kendaraan Tangki --</option>
+                <option value="">-- Pilih Truk Engkel --</option>
                 {kendaraan.map((k) => (
                   <option key={k.id} value={k.id}>
                     {k.plat_nomor} &mdash; Kapasitas Maks: {k.kapasitas_ton} Tabung

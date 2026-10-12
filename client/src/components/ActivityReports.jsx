@@ -42,7 +42,7 @@ export default function ActivityReports({ date, compact = false }) {
       <div className="table-header-flex"><h2>Aktivitas Login & Pemantauan Fatigue</h2>{compact ? <Link className="btn btn-sm btn-outline" to={`/manager/aktivitas?date=${date}`}>Lihat Semua Laporan</Link> : <button className="btn btn-sm btn-outline" onClick={reload}>Refresh Laporan</button>}</div>
       {error && <p className="banner warn" role="alert">{data ? 'Pembaruan gagal, menampilkan laporan terakhir. ' : ''}{error.message}</p>}
       {loading && !data && <p>Memuat laporan aktivitas...</p>}
-      <p className="text-sm">{logins.length} login · {reports.length} rekaman · {reports.filter(report => report.status === 'MENUNGGU').length} menunggu peninjauan. Filter laporan berdasarkan tanggal WITA; status kamera di bawah menunjukkan keadaan saat ini.</p>
+      <p className="text-sm">{logins.length} login · {reports.length} rekaman · {reports.filter(report => report.status === 'MENUNGGU').length} menunggu peninjauan. Rekaman ditampilkan pada tanggal rekam atau tanggal submit WITA; status kamera di bawah menunjukkan keadaan saat ini.</p>
       <div className="stat-grid mt-sm">
         {(data?.monitoring || []).map(driver => <div key={driver.sopir_id} className="card">
           <strong>{driver.nama}</strong><p className="text-sm">{driver.camera_error || (driver.active ? 'Pemantauan kamera aktif' : driver.camera_enabled ? 'Pemantauan terputus / aplikasi tidak aktif' : 'Kamera belum aktif / dihentikan')}</p>
@@ -67,6 +67,6 @@ export default function ActivityReports({ date, compact = false }) {
         {!reports.length && <p>Belum ada rekaman pada tanggal ini.</p>}
       </div>
     </div>
-    {!compact && <p className="muted text-sm mt">Menampilkan maksimal 200 login dan 200 rekaman terbaru per tanggal. Laporan yang dikirim setelah koneksi pulih mengikuti tanggal rekam dan mencantumkan jam submit sebenarnya.</p>}
+    {!compact && <p className="muted text-sm mt">Menampilkan maksimal 200 login dan 200 rekaman terbaru per tanggal. Laporan yang tertunda saat koneksi terputus juga muncul pada tanggal submit, dengan jam rekam dan jam submit sebenarnya.</p>}
   </div>;
 }

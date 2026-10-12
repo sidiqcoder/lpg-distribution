@@ -28,7 +28,8 @@ Deno.serve(async (request: Request) => {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, range',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, HEAD, OPTIONS',
-    'Access-Control-Expose-Headers': 'Content-Disposition, Content-Range, Accept-Ranges',
+    'Access-Control-Expose-Headers': 'Content-Disposition, Content-Range, Accept-Ranges, Date, X-Server-Time',
+    'X-Server-Time': new Date().toISOString(),
     'Cache-Control': 'no-store',
     'Referrer-Policy': 'no-referrer',
     'X-Content-Type-Options': 'nosniff'
@@ -48,6 +49,8 @@ Deno.serve(async (request: Request) => {
     }
     const part = path.match(/^\/api\/files\/part\/([^/]+)\/(\d+)$/);
     if (part && request.method === 'PUT') return response.json(await media.part(user, decodeURIComponent(part[1]), Number(part[2]), request));
+    const proxy = path.match(/^\/api\/files\/proxy\/([a-zA-Z0-9][a-zA-Z0-9._-]*)$/);
+    if (proxy && request.method === 'PUT') return response.json(await r2.proxyUpload(user, proxy[1], request));
     if (path === '/api/files/finish' && request.method === 'POST') {
       const { filename } = await request.json();
       if (typeof filename !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(filename)) return response.status(400).json({ error: 'Nama file tidak valid.' });
@@ -116,7 +119,7 @@ Deno.serve(async (request: Request) => {
       }
     }
     // GPS, uploads and report reads must not wait for daily route generation.
-    if (/^\/api\/driver\/\d+\/(summary|routes)$/.test(path) && routeDate !== formatDate()) {
+    if ((/^\/api\/driver\/\d+\/(summary|routes)$/.test(path) || path === '/api/tracking') && routeDate !== formatDate()) {
       const date = formatDate();
       if (!routePreparation) routePreparation = ensureDailyRoutes(database, date).then(() => { routeDate = date; }).finally(() => { routePreparation = null; });
       await routePreparation;
@@ -124,8 +127,8 @@ Deno.serve(async (request: Request) => {
     await route.handler(req, response);
     return await response.finish();
   } catch (cause) {
-    const err = cause as Error & { status?: number };
+    const err = cause as Error & { status?: number; code?: string };
     console.error('LPG API:', err.message);
-    return new Response(JSON.stringify({ error: err.status ? err.message : 'Terjadi kesalahan pada server.' }), { status: err.status || 500, headers: new Headers([...headers, ['Content-Type', 'application/json']]) });
+    return new Response(JSON.stringify({ error: err.status ? err.message : 'Terjadi kesalahan pada server.', code: err.code }), { status: err.status || 500, headers: new Headers([...headers, ['Content-Type', 'application/json']]) });
   }
 });

@@ -95,7 +95,7 @@ app.get('/api/driver/:id/routes', async (req, res) => {
   try {
     const rute = await queryAll('SELECT * FROM rute_harian WHERE sopir_id = ? AND tanggal = ? ORDER BY urutan ASC', [id, today]);
     const deliveredRows = await queryAll('SELECT DISTINCT pangkalan_nama FROM pengiriman WHERE sopir_id = ? AND tanggal = ?', [id, today]);
-    res.json({ rute, delivered: deliveredRows.map((r) => r.pangkalan_nama) });
+    res.json({ rute: rute.filter(r => r.urutan > 0), origin: rute.find(r => r.urutan === 0) || null, delivered: deliveredRows.map((r) => r.pangkalan_nama) });
   } catch (err) { res.status(500).json({ error: 'Gagal membaca rute.' }); }
 });
 
@@ -105,6 +105,9 @@ app.post('/api/driver/inspection', upload.fields(
   const body = req.body;
   const files = req.files || {};
   const fileName = (name) => (files[name] && files[name][0] ? files[name][0].filename : null);
+  const missing = CHECKLIST_SECTIONS.flatMap(section => section.items.map((item, idx) => ({ item, value: body[`status_${section.id}_${idx}`] })))
+    .find(item => !['BAIK', 'TIDAK'].includes(item.value));
+  if (missing) return res.status(400).json({ error: `Checklist belum lengkap. Pilih kondisi untuk: ${missing.item}.` });
   try {
     const checklist = [];
     CHECKLIST_SECTIONS.forEach((section) => {
@@ -352,7 +355,7 @@ app.get('/api/manager/kpi/recommendations', async (req, res) => {
     const [inspeksiRows, pengirimanRows, ruteRows, bahayaRows] = await Promise.all([
       queryAll('SELECT * FROM inspeksi_pagi WHERE tanggal = ?', [date]),
       queryAll('SELECT * FROM pengiriman WHERE tanggal = ?', [date]),
-      queryAll('SELECT * FROM rute_harian WHERE tanggal = ?', [date]),
+      queryAll('SELECT * FROM rute_harian WHERE tanggal = ? AND urutan > 0', [date]),
       queryAll('SELECT * FROM laporan_bahaya WHERE tanggal = ?', [date])
     ]);
 
@@ -439,8 +442,10 @@ app.get('/api/manager/export.xlsx', async (req, res) => {
         WHERE l.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
         AND l.created_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar') ORDER BY l.created_at`, [tanggal, tanggal]),
       queryAll(`SELECT f.*, s.nama FROM fatigue_reports f JOIN sopir s ON s.id = f.sopir_id
-        WHERE f.captured_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
-        AND f.captured_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar') ORDER BY f.captured_at`, [tanggal, tanggal])
+        WHERE (f.captured_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
+        AND f.captured_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar'))
+        OR (f.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Makassar')
+        AND f.created_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar')) ORDER BY f.created_at`, [tanggal, tanggal, tanggal, tanggal])
     ]);
 
     const lolos = inspeksi.filter((i) => i.status_validasi === 'AMAN').length;

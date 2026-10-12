@@ -1,4 +1,6 @@
-export function todayWITA(date = new Date()) {
+import { serverNow } from './clock';
+
+export function todayWITA(date = serverNow()) {
   return new Date(date).toLocaleDateString('sv-SE', { timeZone: 'Asia/Makassar' });
 }
 

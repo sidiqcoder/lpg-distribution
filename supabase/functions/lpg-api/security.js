@@ -32,11 +32,11 @@ export async function login(database, body) {
 
 export async function authenticate(database, request) {
   const token = request.headers.get('authorization')?.replace(/^Bearer /i, '');
-  if (!token || token.length > 200) throw error(401, 'Sesi berakhir. Silakan masuk kembali.');
+  if (!token || token.length > 200) throw Object.assign(error(401, 'Sesi berakhir. Silakan masuk kembali.'), { code: 'SESSION_EXPIRED' });
   const tokenHash = await digest(token);
   const [user] = await database.unsafe(`SELECT a.username, a.role, a.sopir_id AS id, a.nama, s.token_hash FROM lpg_private.sessions s
     JOIN lpg_private.accounts a ON a.username = s.username WHERE s.token_hash = $1 AND s.expires_at > now()`, [tokenHash]);
-  if (!user) throw error(401, 'Sesi berakhir. Silakan masuk kembali.');
+  if (!user) throw Object.assign(error(401, 'Sesi berakhir. Silakan masuk kembali.'), { code: 'SESSION_EXPIRED' });
   return user;
 }
 
@@ -67,7 +67,7 @@ export async function authorize(database, req, path, method, user) {
       const [lpg] = await database.unsafe('SELECT status FROM permintaan_lpg WHERE sopir_id = $1 AND tanggal = $2', [user.id, formatDate()]);
       if (inspection?.status_validasi !== 'AMAN' || lpg?.status !== 'DISETUJUI') throw error(409, 'Inspeksi dan permintaan LPG harus disetujui sebelum pengiriman.');
       if (!Number.isInteger(Number(req.body.jumlah_dikirim_tabung)) || Number(req.body.jumlah_dikirim_tabung) < 1) throw error(400, 'Jumlah tabung pengiriman tidak valid.');
-      const [route] = await database.unsafe('SELECT latitude, longitude FROM rute_harian WHERE sopir_id = $1 AND tanggal = $2 AND pangkalan_nama = $3', [user.id, formatDate(), req.body.pangkalan_nama]);
+      const [route] = await database.unsafe('SELECT latitude, longitude FROM rute_harian WHERE sopir_id = $1 AND tanggal = $2 AND pangkalan_nama = $3 AND urutan > 0', [user.id, formatDate(), req.body.pangkalan_nama]);
       if (!route) throw error(400, 'Pangkalan tidak ditemukan pada rute hari ini.');
       Object.assign(req.assignment, route);
     }

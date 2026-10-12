@@ -46,6 +46,22 @@ Deno.test('R2 configuration preserves the current provider until credentials exi
   assert.equal(config.provider, 'r2'); assert.equal(config.configured, true);
 });
 
+Deno.test('camera proxy checks ownership and size, finalizes once and preserves its capture ID', async () => {
+  const { r2, rows, operations } = fixture();
+  const captureId = crypto.randomUUID();
+  const planned = await r2.plan(user, { originalname: 'capture.webm', size: 6, type: 'video/webm', purpose: 'fatigue', captureId });
+  const request = bytes => new Request('https://app.test/proxy', { method: 'PUT', body: new Uint8Array(bytes) });
+  await assert.rejects(() => r2.proxyUpload({ ...user, username: 'other-driver' }, planned.filename, request(6)), { status: 403 });
+  await assert.rejects(() => r2.proxyUpload(user, planned.filename, request(7)), { status: 413 });
+  await assert.rejects(() => r2.proxyUpload(user, planned.filename, request(5)), { status: 400 });
+  await r2.proxyUpload(user, planned.filename, request(6));
+  const puts = operations.filter(op => op.method === 'PUT').length;
+  await r2.proxyUpload(user, planned.filename, request(6));
+  assert.equal(operations.filter(op => op.method === 'PUT').length, puts);
+  assert.equal(rows.get(planned.filename).ready, true);
+  assert.equal(rows.get(planned.filename).capture_id, captureId);
+});
+
 Deno.test('R2 upload signature binds temporary key and type; playback signature grants only finalized object access', async () => {
   const f = fixture();
   const plan = await f.r2.plan(user, { originalname: 'capture.webm', size: 6, type: 'video/webm', purpose: 'fatigue', captureId: crypto.randomUUID() });

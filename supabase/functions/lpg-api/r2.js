@@ -110,6 +110,33 @@ export function r2Storage(database, config, clientOverride) {
     return { mimetype: file.content_type, size: Number(file.total_size), provider: 'r2', purpose: file.purpose, captureId: file.capture_id };
   }
 
+  async function proxyUpload(user, filename, request) {
+    const file = await owned(user, filename);
+    const limit = 12 * 1024 ** 2;
+    if (file.purpose !== 'fatigue' || Number(file.total_size) > limit) throw fail(413, 'Jalur cadangan hanya untuk rekaman kamera maksimal 12 MB.');
+    if (file.ready) return { ok: true, filename };
+    if (!request.body) throw fail(400, 'Rekaman kamera kosong.');
+    const reader = request.body.getReader();
+    const chunks = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > limit || size > Number(file.total_size)) { await reader.cancel(); throw fail(413, 'Ukuran rekaman melebihi rencana unggahan.'); }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+    if (size !== Number(file.total_size)) throw fail(400, 'Ukuran rekaman tidak sesuai rencana unggahan.');
+    const bytes = new Uint8Array(size);
+    let position = 0;
+    for (const chunk of chunks) { bytes.set(chunk, position); position += chunk.length; }
+    const response = await fetchObject(file.staging_key, { method: 'PUT', headers: { 'Content-Type': file.content_type }, body: bytes });
+    await response.body?.cancel();
+    return finish(user, filename);
+  }
+
   async function sign(names) {
     const files = await database.unsafe('SELECT filename, object_key FROM lpg_private.r2_files WHERE ready AND filename = ANY($1::text[])', [names]);
     return new Map(await Promise.all(files.map(async file => [file.filename, config.configured ? await signed(file.object_key, 'GET', null, 3600) : ''])));
@@ -134,5 +161,5 @@ export function r2Storage(database, config, clientOverride) {
     await database.unsafe('DELETE FROM lpg_private.r2_files WHERE filename = ANY($1::text[])', [files.map(file => file.filename)]);
     return files.map(file => file.filename);
   }
-  return { selected, plan, finish, verifyUpload, sign, save, remove, status: () => ({ videoProvider: config.provider, r2Configured: config.configured, missing: config.missing }) };
+  return { selected, plan, finish, proxyUpload, verifyUpload, sign, save, remove, status: () => ({ videoProvider: config.provider, r2Configured: config.configured, missing: config.missing }) };
 }

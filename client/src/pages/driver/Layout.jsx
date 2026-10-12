@@ -8,7 +8,7 @@ export default function DriverLayout() {
   const { user } = useAuth();
   return (
     <Layout role="driver" user={user} title="Dashboard Sopir">
-      <DriverTelemetry user={user}>
+      <DriverTelemetry key={user.id} user={user}>
         <FatigueMonitor user={user} />
         <Outlet />
       </DriverTelemetry>

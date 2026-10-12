@@ -53,6 +53,7 @@ export function useApi(path, { interval = 0, params, enabled = true } = {}) {
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onVisibility);
 
     return () => {
       mounted.current = false;
@@ -62,6 +63,7 @@ export function useApi(path, { interval = 0, params, enabled = true } = {}) {
       if (timer) clearInterval(timer);
       unsubscribe();
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onVisibility);
     };
   }, [load, interval, enabled]);
 

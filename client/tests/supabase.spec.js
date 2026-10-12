@@ -191,6 +191,8 @@ test('large form attachment is uploaded automatically and stays private', async 
     const { apiForm, apiGet } = await import('/src/api.js');
     const form = new FormData();
     form.set('sopir_id', String(id)); form.set('kendaraan_id', '1');
+    const meta = await apiGet('/meta');
+    for (const section of meta.sections) section.items.forEach((_, index) => form.set(`status_${section.id}_${index}`, 'BAIK'));
     const content = new Uint8Array(17 * 1024 * 1024).fill(37);
     form.set('video_section_5', new File([content], 'e2e-large.mp4', { type: 'video/mp4' }));
     await apiForm('/driver/inspection', form);
