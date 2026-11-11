@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { backend } from './cloud-config.js';
 
 const fixturePath = new URL('../../.local/monitoring-credentials.json', import.meta.url);
 const fixture = fs.existsSync(fixturePath) ? JSON.parse(fs.readFileSync(fixturePath, 'utf8')) : null;
-const backend = 'https://lvrxcxskroskkeifjyry.supabase.co/functions/v1/lpg-api/api';
 test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }, permissions: ['geolocation', 'camera'], geolocation: { latitude: -8.17, longitude: 113.7 } });
 
 async function login(page, role, username, password) {

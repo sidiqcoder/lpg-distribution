@@ -13,7 +13,7 @@ Referensi: [memulai R2](https://developers.cloudflare.com/r2/get-started/), [kun
 
 ## Mengaktifkan backend
 
-Buka [Supabase > Edge Functions > Secrets](https://supabase.com/dashboard/project/lvrxcxskroskkeifjyry/functions/secrets), lalu tambahkan lima nilai berikut:
+Buka [Supabase > Edge Functions > Secrets](https://supabase.com/dashboard/project/nwqnzhegnejtffqsoalx/functions/secrets), lalu tambahkan lima nilai berikut:
 
 | Secret | Nilai |
 | --- | --- |
@@ -26,7 +26,7 @@ Buka [Supabase > Edge Functions > Secrets](https://supabase.com/dashboard/projec
 Template tersedia di `supabase/r2-secrets.example.env`. Alternatif jika Supabase CLI sudah login: salin template ke `supabase/r2-secrets.env` (diabaikan Git), isi nilainya, lalu jalankan:
 
 ```powershell
-npx supabase secrets set --project-ref lvrxcxskroskkeifjyry --env-file supabase/r2-secrets.env
+npx supabase secrets set --project-ref nwqnzhegnejtffqsoalx --env-file supabase/r2-secrets.env
 ```
 
 Tanpa konfigurasi R2, instalasi yang sudah ada tetap memakai Supabase. Jika `VIDEO_STORAGE_PROVIDER=r2` dipilih tetapi kredensial belum lengkap, unggahan video ditolak dengan pesan konfigurasi; aplikasi tidak diam-diam mengisi Storage Supabase.

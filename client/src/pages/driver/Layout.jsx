@@ -1,3 +1,4 @@
+import DeliveryAnnouncements from '../../components/DeliveryAnnouncements';
 import { Outlet } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../auth';
@@ -10,6 +11,7 @@ export default function DriverLayout() {
     <Layout role="driver" user={user} title="Dashboard Sopir">
       <DriverTelemetry key={user.id} user={user}>
         <FatigueMonitor user={user} />
+        <DeliveryAnnouncements />
         <Outlet />
       </DriverTelemetry>
     </Layout>

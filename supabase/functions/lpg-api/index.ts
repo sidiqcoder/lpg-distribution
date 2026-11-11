@@ -1,6 +1,7 @@
 import { createClient } from 'supabase';
 import { openDatabase, queries } from './database.js';
 import { createRouter, upload, parseRequest, createResponse } from './router.js';
+import { registerOperations } from './operations.js';
 import { registerRoutes } from './routes.js';
 import { login, authenticate, authorize } from './security.js';
 import { storage } from './storage.js';
@@ -18,6 +19,7 @@ const r2 = r2Storage(database, r2Configuration((name: string) => Deno.env.get(na
 const files = storage(supabase, media, r2);
 const app = createRouter();
 registerRoutes(app, { ...queries(database), database, upload, ...files });
+registerOperations(app, { ...queries(database), database });
 registerMonitoring(app, { ...queries(database), database, upload, ...files });
 registerStorageRoutes(app, { database, supabase, media, r2 });
 let routeDate = '';
@@ -119,7 +121,7 @@ Deno.serve(async (request: Request) => {
       }
     }
     // GPS, uploads and report reads must not wait for daily route generation.
-    if ((/^\/api\/driver\/\d+\/(summary|routes)$/.test(path) || path === '/api/tracking') && routeDate !== formatDate()) {
+    if ((/^\/api\/driver\/\d+\/(summary|routes)$/.test(path) || path.startsWith('/api/manager/') || path.endsWith('/announcements') || path === '/api/tracking') && routeDate !== formatDate()) {
       const date = formatDate();
       if (!routePreparation) routePreparation = ensureDailyRoutes(database, date).then(() => { routeDate = date; }).finally(() => { routePreparation = null; });
       await routePreparation;

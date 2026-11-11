@@ -12,6 +12,7 @@ const DriverProfile = lazy(() => import('./pages/driver/Profile'));
 const DriverMap = lazy(() => import('./pages/driver/MapView'));
 const DriverInspectionStatus = lazy(() => import('./pages/driver/InspectionStatus'));
 const DriverLpgStatus = lazy(() => import('./pages/driver/LpgStatus'));
+const DriverSafety = lazy(() => import('./pages/driver/Safety'));
 const DriverActions = lazy(() => import('./pages/driver/Actions'));
 const DriverInspectionForm = lazy(() => import('./pages/driver/InspectionForm'));
 const DriverLpgRequest = lazy(() => import('./pages/driver/LpgRequest'));
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="status-inspeksi" element={<DriverInspectionStatus />} />
             <Route path="status-lpg" element={<DriverLpgStatus />} />
             <Route path="menu" element={<DriverActions />} />
+            <Route path="bahaya" element={<DriverSafety />} />
             <Route path="inspeksi-form" element={<DriverInspectionForm />} />
             <Route path="permintaan-lpg" element={<DriverLpgRequest />} />
             <Route path="on-duty" element={<DriverOnDuty />} />

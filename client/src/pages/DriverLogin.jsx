@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { apiJson } from '../api';
 import { useAuth } from '../auth';
@@ -10,7 +10,7 @@ export default function DriverLogin() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, restoring } = useAuth();
   const location = useLocation();
 
   const submit = async (e) => {
@@ -28,6 +28,9 @@ export default function DriverLogin() {
       setBusy(false);
     }
   };
+
+  if (restoring) return <div className="card loading-card">Memuat sesi...</div>;
+  if (user) return <Navigate to={user.role === 'manager' ? '/manager' : '/sopir'} replace />;
 
   return (
     <div className="auth-page-container">

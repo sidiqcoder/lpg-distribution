@@ -2,7 +2,7 @@
 
 Frontend React/Vite siap di-host sebagai website statis di Vercel. Seluruh API berjalan di Supabase Edge Functions; data operasional disimpan di PostgreSQL Supabase. Video menggunakan Cloudflare R2 privat setelah dikonfigurasi; foto/PDF dan lampiran lama tetap dapat dibaca dari Supabase Storage. Frontend lokal terhubung langsung ke project cloud yang sama.
 
-Project: [lpg-distribution-app di Supabase](https://supabase.com/dashboard/project/lvrxcxskroskkeifjyry). Region: Singapore. Backend: `supabase/functions/lpg-api/index.ts`. Frontend: `client/src/main.jsx`.
+Project: [lpg di Supabase](https://supabase.com/dashboard/project/nwqnzhegnejtffqsoalx). Region: Tokyo (`ap-northeast-1`). Backend: `supabase/functions/lpg-api/index.ts`. Frontend: `client/src/main.jsx`.
 
 ## Menjalankan lokal
 
@@ -26,7 +26,7 @@ Deploy dilakukan oleh pemilik project. Gunakan **`client`** sebagai Root Directo
 | Install Command | `npm ci` |
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
-| `VITE_SUPABASE_URL` | `https://lvrxcxskroskkeifjyry.supabase.co` |
+| `VITE_SUPABASE_URL` | `https://nwqnzhegnejtffqsoalx.supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable key dari `client/.env.local` atau dashboard Supabase |
 
 Isi kedua environment variable pada environment Vercel yang dipakai, kemudian build/deploy. Environment variable tidak otomatis diambil dari `.env.local` laptop karena file tersebut tidak masuk Git. URL halaman dalam aplikasi memakai SPA rewrite. Backend sudah aktif di Supabase dan tidak perlu di-deploy ke Vercel. Tidak ada service role key atau password database di frontend.
@@ -42,7 +42,7 @@ Untuk project Vercel yang memakai root repository, `vercel.json` di root tetap t
 5. On-Duty tersedia setelah inspeksi AMAN dan LPG DISETUJUI. Sopir memilih pangkalan di rute, mengisi penerima dan jumlah tabung, serta mengunggah bukti pengiriman.
 6. Tracking, laporan bahaya, sertifikat K3, penilaian/rekomendasi KPI, filter tanggal, dan ekspor Excel tersedia melalui menu semula.
 
-Keputusan LPG memakai transaksi dan penguncian baris. Persetujuan berulang tidak memotong stok berulang; perubahan pengajuan mengembalikan alokasi sebelumnya sebelum menunggu keputusan baru. Mulai 12 Oktober 2026, rute Budi dan Ahmad mengikuti koordinat dan urutan PDF yang diberikan pengguna: titik keberangkatan bersama dan masing-masing 10 tujuan. Tujuan baru ditambahkan setelah penugasan yang sudah ada pada hari berjalan; hari berikutnya memakai urutan PDF. Riwayat pengiriman dan rute lama dipertahankan. PDF tidak memuat nama pangkalan, kuota, atau estimasi tiba; nama sementara memakai nomor tujuan dan kuota/estimasi ditampilkan belum ditetapkan. Data GPS disimpan di database sehingga tidak bergantung pada proses server yang tetap hidup.
+Keputusan LPG memakai transaksi dan penguncian baris. Persetujuan berulang tidak memotong stok berulang; perubahan pengajuan mengembalikan alokasi sebelumnya sebelum menunggu keputusan baru. Mulai 12 Oktober 2026, rute Budi dan Ahmad mengikuti koordinat dan urutan PDF yang diberikan pengguna: titik keberangkatan bersama dan masing-masing 10 tujuan. Tujuan baru ditambahkan setelah penugasan yang sudah ada pada hari berjalan; hari berikutnya memakai urutan PDF. Riwayat pengiriman dan rute lama dipertahankan. Mulai revisi 4 November 2026, nama 20 tujuan mengikuti tabel dalam `revisi/update perbaikan web 1.docx`, dicocokkan berdasarkan koordinat. Permintaan awal 56 tabung dapat diubah manager per tujuan. Batas tiba dimulai 09.00 WITA dan bertambah satu jam sesuai urutan penugasan. Data GPS disimpan di database sehingga tidak bergantung pada proses server yang tetap hidup.
 
 ## Akses dan lampiran
 
@@ -62,7 +62,7 @@ Tiga pengiriman lama memiliki `waktu_selesai` berupa `Inval`. Nilai aslinya dipe
 
 `legacy/` berisi kode sebelum rebuild sebagai referensi. `lpg_database.db` dan `uploads/` tetap disimpan sebagai sumber dan tidak dimodifikasi. `.vercelignore` mengecualikan sumber lama, data lokal, alat migrasi, dan file test dari frontend Vercel.
 
-Migration SQL yang sudah diterapkan ada di `supabase/migrations/`. `npm run migrate:prepare` hanya membaca sumber lokal dan menyiapkan SQL impor privat di `.local/import-data.sql`; tidak menerapkan SQL otomatis. `npm run migrate:uploads` adalah alat manager untuk memindahkan lampiran lama, dengan pemeriksaan nama file, retry jaringan, dan dukungan melanjutkan berdasarkan `.local/storage-existing.json` yang diperoleh dari daftar objek project. Alat ini memerlukan `curl`, yang sudah tersedia pada Windows di workspace ini.
+Migration SQL yang sudah diterapkan ada di `supabase/migrations/`. `npm run migrate:prepare` hanya membaca sumber lokal dan menyiapkan SQL impor privat di `.local/import-data.sql`; tidak menerapkan SQL otomatis. `npm run migrate:uploads` adalah alat manager untuk memindahkan lampiran lama, dengan pemeriksaan nama file, retry jaringan, dan dukungan melanjutkan berdasarkan `.local/upload-migrations/<hostname-project>/storage-existing.json`. Progres disimpan per project tujuan setelah setiap batch agar pergantian project tidak melewatkan file yang baru tersedia di project lama. Alat ini memerlukan `curl`, yang sudah tersedia pada Windows di workspace ini.
 
 Untuk perubahan backend berikutnya, gunakan Supabase CLI/MCP yang sudah terautentikasi. Jalankan `npx supabase functions deploy --help` untuk memeriksa opsi CLI yang terpasang; deploy function `lpg-api` ke project yang sama. Konfigurasi `verify_jwt = false` diperlukan karena login username/password memakai autentikasi sesi custom di dalam function, bukan JWT Supabase Auth.
 
@@ -91,3 +91,17 @@ Sopir dapat mengaktifkan pemantauan kamera depan dari dashboard, memilih foto at
 Satu rekaman yang belum terkirim disimpan di IndexedDB perangkat dan dicoba ulang saat koneksi tersedia. Capture ID menjaga retry agar tidak mencatat laporan ganda. Video kamera maksimal 12 MB memiliki jalur unggah cadangan melalui API jika unggahan langsung ke R2 gagal; kepemilikan, ukuran, dan capture ID tetap diperiksa. Kesalahan validasi dibedakan dari masalah koneksi dan menyediakan tombol **Kirim Ulang Rekaman**. Waktu rekaman lama yang masih di depan server karena jam perangkat diperbaiki sebelum retry, tanpa menghapus rekaman. Rekaman masuk ke Storage privat dan halaman `/manager/aktivitas`, dengan jam rekam, jam submit aktual, status kamera, dan hasil peninjauan manager. Rekaman tertunda muncul pada tanggal rekam maupun tanggal submit di dashboard dan Excel. Manager memberi penilaian **Fit** atau **Perlu Istirahat** beserta catatan. Penilaian dilakukan manager berdasarkan rekaman; belum ada model pendeteksi fatigue otomatis. Histori login berasal dari login berhasil setelah fitur diterapkan dan sesi lama yang masih tersedia saat migrasi.
 
 `npm test` mencakup regression test backend, mock browser untuk dua perangkat, peta, gangguan koneksi, antrean rekaman, jadwal 30 menit, video 7 detik, dan WITA, serta test cloud yang tersedia. Uji penulisan kamera ke cloud memakai fixture sementara terpisah di `.local/monitoring-credentials.json`; tanpa fixture, test tersebut dilewati. Kredensial, akun, laporan, dan objek Storage sementara dibersihkan setelah verifikasi. Frontend perlu di-deploy ulang ke Vercel agar perubahan UI muncul pada website publik.
+
+
+## Revisi operasional 4 November 2026
+
+- Halaman login mengarahkan sesi yang masih aktif langsung ke dashboard sesuai peran. Logout atau sesi kedaluwarsa tetap memerlukan login kembali.
+- Manager mengatur permintaan tabung setiap lokasi melalui menu **Pengiriman**. Sopir melihat permintaan dan batas tiba pada daftar pengiriman serta popup peta. Draf manager tetap tersimpan saat polling.
+- Pemberitahuan tujuan yang melewati deadline tampil di seluruh halaman dashboard sopir dan diperbarui setiap 15 detik. KPI ketepatan menggunakan waktu pencatatan bukti pengiriman di server, termasuk pengiriman yang belum dilakukan.
+- KPI otomatis terdiri dari ketepatan (25%, target 95%), penyelesaian tugas (20%, target 100%), kepatuhan rute (15%, target 95%), penyelesaian inspeksi kendaraan (15%, target 100%), bukti pengiriman (10%, target 100%), dan pemeriksaan kondisi sopir (15%, target 100%). Skor = realisasi / target ? 100; skor akhir = skor ? bobot / 100. Total menjumlahkan skor akhir tanpa pembatasan 100 karena target 95% dapat dilampaui.
+- Kepatuhan rute menggunakan proporsi sampel GPS dalam koridor 500 meter dari segmen rute, dengan akurasi GPS maksimal 100 meter, setelah inspeksi dan kuota disetujui hingga tujuan selesai. Data yang belum ada menghasilkan realisasi 0. Ini merupakan ukuran berdasarkan sampel GPS, bukan rekonstruksi jarak perjalanan.
+- Penyelesaian checklist kendaraan menghitung jawaban BAIK/TIDAK pada bagian selain bagian pengemudi. Form inspeksi merekam konfirmasi pemeriksaan fisik dan tingkat kelelahan. Inspeksi yang dicatat setelah pengiriman pertama tidak mendapat skor pra-keberangkatan. Pemeriksaan ini berupa catatan pengisian sopir, bukan diagnosis otomatis dari kamera.
+- Ikon kendaraan memakai SVG dan aset marker Leaflet disertakan dalam build. Nama tujuan tampil sebagai label peta.
+- Menu **Laporkan Bahaya & MSDS LPG** tersedia sebelum persetujuan berangkat. Lokasi GPS disertakan jika tersedia; koordinat yang belum tersedia tidak diganti dengan lokasi contoh. Kontak internal dalam dokumen revisi belum diverifikasi dan ditandai pada panduan.
+
+Pada 11 November 2026, seluruh 10 migrasi termasuk `supabase/migrations/20261104000000_document_revisions.sql` sudah diterapkan ke project baru `nwqnzhegnejtffqsoalx`, dan function `lpg-api` sudah aktif. Sesuai pilihan pemilik, data awal memakai salinan lokal SQLite yang disiapkan 9 Oktober 2026: 690 baris operasional serta 3 akun login. Data tambahan di project cloud lama setelah salinan tersebut tidak otomatis ikut. Seluruh 219 lampiran lokal sudah dipindahkan ke Storage privat, berukuran total 323.655.774 byte; dua video besar disimpan sebagai bagian sehingga jumlah objek Storage adalah 227. R2 belum diaktifkan pada project baru. Riwayat lokasi sebelum 4 November 2026 tidak diubah oleh migrasi. Frontend Vercel masih perlu diperbarui dengan URL dan publishable key project baru, lalu di-deploy ulang.

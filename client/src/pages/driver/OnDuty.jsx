@@ -1,6 +1,7 @@
+import MsdsGuide from '../../components/MsdsGuide';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import MapCanvas, { L, dotIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, truckIcon, locationIcon } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
 import { apiForm } from '../../api';
@@ -56,7 +57,7 @@ export default function DriverOnDuty() {
     const off = distance != null && distance > 0.5 && accuracy <= 100;
     const map = mapRef.current;
     if (map) {
-      const icon = dotIcon(off ? '#b91c1c' : '#15803d', 16);
+      const icon = truckIcon(off ? '#b91c1c' : '#15803d', 16);
       if (markerRef.current) markerRef.current.setLatLng([lat, lng]).setIcon(icon);
       else markerRef.current = L.marker([lat, lng], { icon }).addTo(map);
       markerRef.current.bindPopup(off ? 'Peringatan: Keluar Jalur Rute' : 'Posisi Kendaraan Aktif');
@@ -70,7 +71,7 @@ export default function DriverOnDuty() {
     const map = mapRef.current;
     if (map) {
       if (routeMarkerRef.current) map.removeLayer(routeMarkerRef.current);
-      routeMarkerRef.current = L.marker([Number(r.latitude), Number(r.longitude)]).addTo(map).bindPopup(r.pangkalan_nama);
+      routeMarkerRef.current = L.marker([Number(r.latitude), Number(r.longitude)], { icon: locationIcon() }).addTo(map).bindPopup(document.createTextNode(r.pangkalan_nama));
       map.setView([Number(r.latitude), Number(r.longitude)], 15);
     }
   };
@@ -222,7 +223,7 @@ export default function DriverOnDuty() {
                     <div className="route-info-col">
                       <strong>{r.pangkalan_nama}</strong>
                       <span className="muted block text-sm">
-                        {r.permintaan_ton > 0 ? `Permintaan: ${r.permintaan_ton} Ton` : 'Kuota belum ditetapkan'} &middot; {r.estimasi_waktu_tiba ? `Estimasi: ${r.estimasi_waktu_tiba} WITA` : 'Estimasi belum ditetapkan'}
+                        {`Permintaan: ${r.permintaan_tabung ?? 0} Tabung`} &middot; {r.estimasi_waktu_tiba ? `Batas tiba: ${r.estimasi_waktu_tiba} WITA` : 'Estimasi belum ditetapkan'}
                       </span>
                     </div>
                     <div className="route-status-col">
@@ -277,7 +278,7 @@ export default function DriverOnDuty() {
 
               <div className="form-group mt-sm">
                 <label>Jumlah Tabung Dikirim (Tabung)</label>
-                <input type="number" name="jumlah_dikirim_tabung" required placeholder="Contoh: 100" />
+                <input type="number" name="jumlah_dikirim_tabung" min="1" step="1" defaultValue={selected.permintaan_tabung || ""} required placeholder="Contoh: 100" />
               </div>
 
               <div className="field-row">
@@ -338,6 +339,7 @@ export default function DriverOnDuty() {
         </div>
       </div>
 
+      <MsdsGuide />
       {/* Modal Laporan Bahaya */}
       {hazardOpen && (
         <div className="modal-backdrop" onClick={() => setHazardOpen(false)}>
@@ -348,6 +350,7 @@ export default function DriverOnDuty() {
                 <Icon name="x" size={16} />
               </button>
             </div>
+            <MsdsGuide />
             <form ref={hazardFormRef} onSubmit={submitHazard}>
               <div className="form-group">
                 <label>Jenis Kejadian Bahaya</label>
@@ -376,8 +379,8 @@ export default function DriverOnDuty() {
                 <input type="file" name="foto_bukti" accept="image/*" required />
               </div>
 
-              <input type="hidden" name="latitude" value="-8.17" />
-              <input type="hidden" name="longitude" value="113.70" />
+              <input type="hidden" name="latitude" value={position?.latitude ?? ""} />
+              <input type="hidden" name="longitude" value={position?.longitude ?? ""} />
 
               <div className="form-actions-bar mt">
                 <button className="btn btn-bad btn-block" type="submit" disabled={busy}>

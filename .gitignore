@@ -19,6 +19,9 @@ supabase/.env.local
 supabase/r2-secrets.env
 client/test-results/
 client/playwright-report/
+.playwright-mcp/
+.vercel/
+client/.vercel/
 
 # Database local & logs
 *.db

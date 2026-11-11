@@ -1,3 +1,4 @@
+import MsdsGuide from '../../components/MsdsGuide';
 import RefreshNotice from '../../components/RefreshNotice';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
@@ -38,6 +39,7 @@ export default function ManagerHazards() {
   return (
     <div className="hazards-page-layout">
       <RefreshNotice error={error} />
+      <MsdsGuide />
       <div className="page-head">
         <div>
           <div className="breadcrumb-nav">

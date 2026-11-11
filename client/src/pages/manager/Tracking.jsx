@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import MapCanvas, { L, dotIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, truckIcon } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { fmtSubmit } from '../../utils';
 import { routeStatus, waLink } from '../../tracking';
@@ -29,8 +29,8 @@ export default function ManagerTracking() {
       const color = !item.active ? '#64748b' : status.off ? '#b91c1c' : status.cls === 'ok' ? '#15803d' : '#d97706';
       const popup = document.createElement('div');
       popup.textContent = `${item.nama} · ${status.label} · Akurasi ${Number(item.accuracy || 0).toFixed(0)} m · ${fmtSubmit(item.updated_at)}`;
-      if (markers.current.has(item.sopir_id)) markers.current.get(item.sopir_id).setLatLng(point).setIcon(dotIcon(color)).setPopupContent(popup);
-      else markers.current.set(item.sopir_id, L.marker(point, { icon: dotIcon(color) }).addTo(map).bindPopup(popup));
+      if (markers.current.has(item.sopir_id)) markers.current.get(item.sopir_id).setLatLng(point).setIcon(truckIcon(color)).setPopupContent(popup);
+      else markers.current.set(item.sopir_id, L.marker(point, { icon: truckIcon(color) }).addTo(map).bindPopup(popup));
       if (item.route?.length > 1) L.polyline(item.route.map(stop => [Number(stop.latitude), Number(stop.longitude)]), { color: '#2563eb', weight: 3, dashArray: '6 6' }).addTo(routes.current);
     });
     const located = data.filter(item => item.latitude != null && item.longitude != null);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import MapCanvas, { L, numberIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, numberIcon, locationIcon, escapeHtml } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
 import BackButton from '../../components/BackButton';
@@ -7,7 +7,7 @@ import Icon from '../../components/Icon';
 
 export default function DriverRouteMap() {
   const { user } = useAuth();
-  const { data, error, reload } = useApi(`/driver/${user.id}/routes`);
+  const { data, error, reload } = useApi(`/driver/${user.id}/routes`, { interval: 10000 });
   const [readyMap, setReadyMap] = useState(null);
   const mapRef = useRef(null);
   const drawnRef = useRef(false);
@@ -24,7 +24,8 @@ export default function DriverRouteMap() {
       lng: Number(r.longitude),
       urutan: r.urutan,
       nama: r.pangkalan_nama,
-      ton: r.permintaan_ton,
+      quantity: r.permintaan_tabung,
+      deadline: r.estimasi_waktu_tiba,
       done: delivered.has(r.pangkalan_nama)
     }));
     if (!points.length) return;
@@ -36,9 +37,10 @@ export default function DriverRouteMap() {
     }
     L.polyline(latlngs, { color: '#b91c1c', weight: 4, dashArray: '6 6' }).addTo(layerRef.current);
     points.forEach((p) => {
-      L.marker([p.lat, p.lng], { icon: numberIcon(p.done ? '#15803d' : '#b91c1c', p.urutan) })
+      L.marker([p.lat, p.lng], { icon: locationIcon(p.done ? '#15803d' : '#b91c1c') })
         .addTo(layerRef.current)
-        .bindPopup(`<strong>${p.urutan}. ${p.nama}</strong><br>${p.ton > 0 ? `Permintaan: ${p.ton} Ton` : 'Kuota belum ditetapkan'}<br>Status: ${p.done ? 'Sudah Terkirim' : 'Menunggu Pengiriman'}`);
+        .bindTooltip(escapeHtml(p.nama), { permanent: true, direction: 'right' })
+        .bindPopup(`<strong>${p.urutan}. ${escapeHtml(p.nama)}</strong><br>Permintaan: ${p.quantity ?? 0} Tabung<br>Batas tiba: ${p.deadline || '-'} WITA<br>Status: ${p.done ? 'Sudah Terkirim' : 'Menunggu Pengiriman'}`);
     });
     if (!drawnRef.current && !map.lpgUserMoved) map.fitBounds(latlngs, { padding: [40, 40] });
     drawnRef.current = true;

@@ -1,3 +1,4 @@
+import LocationDemands from '../../components/LocationDemands';
 import RefreshNotice from '../../components/RefreshNotice';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
@@ -61,6 +62,7 @@ export default function ManagerDeliveries() {
         </div>
       </div>
 
+      <LocationDemands key={date} date={date} />
       <div className="card">
         <div className="table-header-flex">
           <div className="flex-row items-center gap-sm">

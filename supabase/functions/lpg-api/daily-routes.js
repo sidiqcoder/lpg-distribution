@@ -1,3 +1,4 @@
+import { locationAt } from './locations.js';
 import { PRESCRIBED_ROUTES, ROUTE_ORIGIN, ROUTE_SOURCE } from './prescribed-routes.js';
 
 // Append today's document stops without altering existing routes or delivery history.
@@ -20,12 +21,14 @@ export async function ensureDailyRoutes(database, today) {
       for (const [documentOrder, coordinates] of [ROUTE_ORIGIN, ...stops].entries()) {
         if (assigned.has(documentOrder)) continue;
         const origin = documentOrder === 0;
+        const location = locationAt(...coordinates);
+        const revised = today >= '2026-11-04';
         await tx.unsafe(`INSERT INTO rute_harian
-          (tanggal,sopir_id,kendaraan_id,urutan,pangkalan_id,pangkalan_nama,latitude,longitude,permintaan_ton,estimasi_waktu_tiba,sumber,urutan_dokumen)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,NULL,$9,$10)`,
+          (tanggal,sopir_id,kendaraan_id,urutan,pangkalan_id,pangkalan_nama,latitude,longitude,permintaan_ton,estimasi_waktu_tiba,sumber,urutan_dokumen,permintaan_tabung)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,$11,$9,$10,$12)`,
           [today, driver.id, driver.kendaraan_id, origin ? 0 : ++order,
-            driver.id * 1000 + documentOrder, origin ? 'Pangkalan (Titik awal berangkat)' : `Tujuan ${driver.username.toLowerCase() === 'budi' ? 'Budi' : 'Ahmad'} ${documentOrder}`,
-            ...coordinates, ROUTE_SOURCE, documentOrder]);
+            driver.id * 1000 + documentOrder, origin ? 'Gudang (Titik awal berangkat)' : revised && location ? location.nama : `Tujuan ${driver.username.toLowerCase() === 'budi' ? 'Budi' : 'Ahmad'} ${documentOrder}`,
+            ...coordinates, ROUTE_SOURCE, documentOrder, revised && !origin ? `${String(8 + documentOrder).padStart(2, '0')}:00:00` : null, revised && !origin ? location?.permintaan_tabung ?? 56 : 0]);
       }
     }
   });

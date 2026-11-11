@@ -34,7 +34,7 @@ export default function DriverInspectionForm() {
     const missing = [...form.querySelectorAll('[required]')].find(input => !input.validity.valid);
     if (missing) {
       const item = missing.closest('.checklist-item-row')?.querySelector('.item-text')?.textContent;
-      setError(item ? `Pilih kondisi BAIK atau TIDAK untuk: ${item}.` : 'Pilih kendaraan yang akan diinspeksi terlebih dahulu.');
+      setError(item ? `Pilih kondisi BAIK atau TIDAK untuk: ${item}.` : missing.type === 'checkbox' ? 'Selesaikan pemeriksaan kondisi fisik dan tingkat kelelahan terlebih dahulu.' : 'Pilih kendaraan yang akan diinspeksi terlebih dahulu.');
       missing.scrollIntoView({ behavior: 'smooth', block: 'center' });
       missing.focus();
       return;
@@ -232,6 +232,11 @@ export default function DriverInspectionForm() {
             />
           </div>
 
+          <fieldset className="card mt">
+            <legend>Pemeriksaan Kondisi Sopir Sebelum Berangkat</legend>
+            <label><input type="checkbox" name="physical_checked" required /> Saya sudah memeriksa kondisi fisik sebelum berangkat.</label>
+            <label><input type="checkbox" name="fatigue_checked" required /> Saya sudah memeriksa tingkat kelelahan sebelum berangkat.</label>
+          </fieldset>
           <div className="form-actions-bar mt">
             {error && <p className="text-danger" role="alert">{error}</p>}
             {busy && <p role="status">Mengunggah lampiran dan mengajukan inspeksi. Mohon tunggu...</p>}

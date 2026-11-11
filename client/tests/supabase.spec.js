@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { backend, supabaseUrl, publishableKey } from './cloud-config.js';
 
-const backend = 'https://lvrxcxskroskkeifjyry.supabase.co/functions/v1/lpg-api/api';
 const fixturePath = new URL('../../.local/e2e-credentials.json', import.meta.url);
 const fixture = fs.existsSync(fixturePath) ? JSON.parse(fs.readFileSync(fixturePath, 'utf8')) : null;
 const image = { name: 'e2e-proof.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aL1EAAAAASUVORK5CYII=', 'base64') };
@@ -61,7 +61,7 @@ test('existing logins, all pages, session restore, access restrictions and Excel
   expect((await api(driver, '/driver/2/profile')).status).toBe(403);
   expect((await api(driver, '/tracking', { sopir_id: 2, latitude: -8, longitude: 113 })).status).toBe(403);
   expect((await request.get(backend + '/manager/summary')).status()).toBe(401);
-  const anonymousData = await request.get('https://lvrxcxskroskkeifjyry.supabase.co/rest/v1/sopir?select=*', { headers: { apikey: 'sb_publishable_SD6g_zgYcqRcWjt-buEAtA_fnVmA3wI' } });
+  const anonymousData = await request.get(`${supabaseUrl}/rest/v1/sopir?select=*`, { headers: { apikey: publishableKey } });
   expect([401, 403]).toContain(anonymousData.status());
   await driver.screenshot({ path: '../.local/driver-mobile.png', fullPage: true });
   await driver.getByRole('button', { name: 'Keluar', exact: true }).click();

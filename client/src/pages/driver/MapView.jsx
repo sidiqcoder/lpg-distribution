@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import MapCanvas, { L, dotIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, truckIcon } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
 
@@ -30,7 +30,7 @@ export default function DriverMap() {
         dashArray: '8 8'
       }).addTo(map);
     }
-    const icon = dotIcon('#b91c1c', 16);
+    const icon = truckIcon('#b91c1c', 16);
     if (markerRef.current) {
       markerRef.current.setLatLng(point).setIcon(icon);
     } else {

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import markerUrl from 'leaflet/dist/images/marker-icon.png';
+import markerRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
+L.Icon.Default.mergeOptions({ iconUrl: markerUrl, iconRetinaUrl: markerRetinaUrl, shadowUrl: markerShadowUrl });
+export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
 
 export default function MapCanvas({ height = 420, center = [-8.17, 113.7], zoom = 12, onReady, onInteraction }) {
   const containerRef = useRef(null);
@@ -96,10 +102,17 @@ export function dotIcon(color, size = 18) {
 export function numberIcon(color, text) {
   return L.divIcon({
     className: '',
-    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,.35);color:#ffffff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center">${text}</div>`,
+    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,.35);color:#ffffff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center">${escapeHtml(text)}</div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14]
   });
 }
 
 export { L };
+
+export function truckIcon(color = '#b91c1c') {
+  return L.divIcon({ className: '', iconSize: [40,40], iconAnchor: [20,20], html: `<div style="width:40px;height:40px;background:${color};border:2px solid white;border-radius:50%;display:grid;place-items:center;box-shadow:0 2px 6px #0006"><svg xmlns="http://www.w3.org/2000/svg" width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M2 5h12v12H2zM14 9h4l4 4v4h-8"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>` });
+}
+export function locationIcon(color = '#b91c1c') {
+  return L.divIcon({ className: '', iconSize: [32,40], iconAnchor: [16,40], html: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 39C10 30 1 22 1 16a15 15 0 1 1 30 0c0 6-9 14-15 23Z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="white"/></svg>` });
+}

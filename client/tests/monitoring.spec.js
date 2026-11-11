@@ -234,6 +234,8 @@ test('WITA reports and manager username are consistent regardless of device time
   const formatted = await page.evaluate(async () => { const { todayWITA, fmtWaktu } = await import('/src/utils.js'); return [todayWITA('2026-10-10T16:30:00Z'), fmtWaktu('2026-10-10T16:30:00Z')]; });
   expect(formatted[0]).toBe('2026-10-11'); expect(formatted[1]).toMatch(/00.30.00 WITA/);
   await page.goto('/admin/login');
+  await expect(page).toHaveURL(/\/manager$/);
+  await page.getByRole('button', { name: 'Keluar dari Akun', exact: true }).click();
   await expect(page.locator('#username')).toHaveAttribute('placeholder', 'manager');
 });
 
@@ -255,6 +257,8 @@ test('inspection submit explains missing fields and complete form reaches status
   await page.getByRole('button', { name: 'Kirim & Ajukan Inspeksi' }).click();
   await expect(page.getByRole('alert').last()).toContainText('Rem berfungsi');
   await page.getByRole('button', { name: 'Set Semua Kondisi BAIK' }).click();
+  await page.locator('[name=physical_checked]').check();
+  await page.locator('[name=fatigue_checked]').check();
   await page.getByRole('button', { name: 'Kirim & Ajukan Inspeksi' }).click();
   await expect(page).toHaveURL(/status-inspeksi/);
   expect(state.inspectionBody).toContain('status_A_0'); expect(state.inspectionBody).toContain('BAIK');

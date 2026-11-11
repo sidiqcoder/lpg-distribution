@@ -43,7 +43,10 @@ async function main() {
   const session = await login.json();
   if (!login.ok) throw new Error(session.error);
   const allFiles = fs.readdirSync(path.join(root, 'uploads')).filter(name => fs.statSync(path.join(root, 'uploads', name)).isFile());
-  const savedPath = path.join(root, '.local/storage-existing.json');
+  // Progress belongs to the destination project; another project's objects do not exist here.
+  const stateDirectory = path.join(root, '.local/upload-migrations', new URL(url).hostname);
+  fs.mkdirSync(stateDirectory, { recursive: true });
+  const savedPath = path.join(stateDirectory, 'storage-existing.json');
   const saved = new Set(fs.existsSync(savedPath) ? JSON.parse(fs.readFileSync(savedPath, 'utf8')) : []);
   const filenames = allFiles.filter(name => !saved.has(name));
   let existing = allFiles.length - filenames.length;
@@ -88,15 +91,17 @@ async function main() {
         } else data = await curlUpload([...authorization, '-F', `file=@${source};type=${type}`,
           `${url}/functions/v1/lpg-api/api/manager/import-upload`], name);
         if (!data.ok) throw new Error(`${name}: ${data.error}`);
+        saved.add(name);
         complete++;
         if (data.existed) existing++;
       }));
+      fs.writeFileSync(savedPath, JSON.stringify([...saved], null, 2));
       const failure = results.find(result => result.status === 'rejected');
       if (failure) throw failure.reason;
       console.log(`Lampiran ${complete}/${allFiles.length}`);
     }
     fs.mkdirSync(path.join(root, '.local'), { recursive: true });
-    fs.writeFileSync(path.join(root, '.local/uploads-report.json'), JSON.stringify({ total: complete, existing, completedAt: new Date().toISOString() }, null, 2));
+    fs.writeFileSync(path.join(stateDirectory, 'uploads-report.json'), JSON.stringify({ total: complete, existing, completedAt: new Date().toISOString() }, null, 2));
   } finally {
     await request(`${url}/functions/v1/lpg-api/api/logout`, { method: 'POST', headers: { Authorization: `Bearer ${session.token}`, apikey: key, 'Content-Type': 'application/json' }, body: '{}' });
   }

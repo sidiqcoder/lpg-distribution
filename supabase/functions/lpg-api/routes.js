@@ -1,3 +1,5 @@
+import { scheduledStops, loadPerformance, deliveryFor } from './performance.js';
+import { distanceToRoute } from './route-geometry.js';
 import ExcelJS from 'npm:exceljs@4.4.0';
 import { Buffer } from 'node:buffer';
 import { formatDate, formatWaktu, formatWaktuLengkap } from './format.js';
@@ -54,6 +56,14 @@ app.post('/api/tracking', async (req, res) => {
       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(sopir_id) DO UPDATE SET latitude = excluded.latitude, longitude = excluded.longitude, accuracy = excluded.accuracy, updated_at = CURRENT_TIMESTAMP
     `, [Number(sopir_id), Number(latitude), Number(longitude), Number(accuracy) || 0]);
+    const planned = await queryAll('SELECT * FROM rute_harian WHERE sopir_id=? AND tanggal=? ORDER BY urutan', [req.user.id,formatDate()]);
+    const ready = await queryOne("SELECT i.created_at FROM inspeksi_pagi i JOIN permintaan_lpg p ON p.sopir_id=i.sopir_id AND p.tanggal=i.tanggal WHERE i.sopir_id=? AND i.tanggal=? AND i.status_validasi='AMAN' AND p.status='DISETUJUI'", [req.user.id,formatDate()]);
+    const deliveries = await queryAll('SELECT * FROM pengiriman WHERE sopir_id=? AND tanggal=?', [req.user.id,formatDate()]);
+    const pending = planned.some(r => r.urutan > 0 && !deliveryFor(r, deliveries));
+    const distance = distanceToRoute(Number(latitude),Number(longitude),planned);
+    if (ready && pending && distance != null && accuracy != null && Number.isFinite(Number(accuracy)) && Number(accuracy) > 0 && Number(accuracy) <= 100) {
+      await run('INSERT INTO route_tracking_samples (sopir_id,on_route,latitude,longitude) VALUES (?,?,?,?)', [req.user.id,distance <= 0.5,Number(latitude),Number(longitude)]);
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Lokasi gagal disimpan' });
@@ -94,8 +104,8 @@ app.get('/api/driver/:id/routes', async (req, res) => {
   const today = formatDate();
   try {
     const rute = await queryAll('SELECT * FROM rute_harian WHERE sopir_id = ? AND tanggal = ? ORDER BY urutan ASC', [id, today]);
-    const deliveredRows = await queryAll('SELECT DISTINCT pangkalan_nama FROM pengiriman WHERE sopir_id = ? AND tanggal = ?', [id, today]);
-    res.json({ rute: rute.filter(r => r.urutan > 0), origin: rute.find(r => r.urutan === 0) || null, delivered: deliveredRows.map((r) => r.pangkalan_nama) });
+    const deliveredRows = await queryAll('SELECT * FROM pengiriman WHERE sopir_id = ? AND tanggal = ?', [id, today]);
+    res.json({ rute: scheduledStops(rute, today), origin: rute.find(r => r.urutan === 0) || null, delivered: rute.filter(r => r.urutan > 0 && deliveryFor(r, deliveredRows)).map(r => r.pangkalan_nama) });
   } catch (err) { res.status(500).json({ error: 'Gagal membaca rute.' }); }
 });
 
@@ -103,6 +113,7 @@ app.post('/api/driver/inspection', upload.fields(
   CHECKLIST_SECTIONS.flatMap((s) => ([{ name: `foto_section_${s.id}`, maxCount: 1 }, { name: `video_section_${s.id}`, maxCount: 1 }]))
 ), async (req, res) => {
   const body = req.body;
+  if (body.physical_checked !== 'on' || body.fatigue_checked !== 'on') return res.status(400).json({ error: 'Selesaikan pemeriksaan fisik dan tingkat kelelahan sebelum berangkat.' });
   const files = req.files || {};
   const fileName = (name) => (files[name] && files[name][0] ? files[name][0].filename : null);
   const missing = CHECKLIST_SECTIONS.flatMap(section => section.items.map((item, idx) => ({ item, value: body[`status_${section.id}_${idx}`] })))
@@ -137,13 +148,15 @@ app.post('/api/driver/inspection', upload.fields(
     }
 
     await run(`
-      INSERT INTO inspeksi_pagi (tanggal, sopir_id, kendaraan_id, checklist_json, lampiran_json, catatan, status_sopir, status_validasi)
-      VALUES (?, ?, ?, ?, ?, ?, 'MENUNGGU_REVIEW', 'MENUNGGU')
+      INSERT INTO inspeksi_pagi (tanggal, sopir_id, kendaraan_id, checklist_json, lampiran_json, catatan, physical_checked, fatigue_checked, status_sopir, status_validasi)
+      VALUES (?, ?, ?, ?, ?, ?, true, true, 'MENUNGGU_REVIEW', 'MENUNGGU')
       ON CONFLICT(sopir_id, tanggal) DO UPDATE SET
         kendaraan_id = excluded.kendaraan_id,
         checklist_json = excluded.checklist_json,
         lampiran_json = excluded.lampiran_json,
         catatan = excluded.catatan,
+        physical_checked = excluded.physical_checked,
+        fatigue_checked = excluded.fatigue_checked,
         status_sopir = 'MENUNGGU_REVIEW',
         status_validasi = 'MENUNGGU',
         validasi_oleh = NULL,
@@ -203,12 +216,13 @@ app.post('/api/driver/delivery', upload.fields([
 
 app.post('/api/driver/hazard', upload.single('foto_bukti'), async (req, res) => {
   const { sopir_id, jenis_bahaya, deskripsi, latitude, longitude } = req.body;
+  if ([latitude,longitude].some((value,index) => value != null && value !== '' && (!Number.isFinite(Number(value)) || Math.abs(Number(value)) > (index === 0 ? 90 : 180)))) return res.status(400).json({ error: 'Koordinat laporan tidak valid.' });
   try {
     const fotoBukti = req.file ? await saveUploadedFile(req.file, req.user) : null;
     await run(`
       INSERT INTO laporan_bahaya (tanggal, sopir_id, kendaraan_id, latitude, longitude, jenis_bahaya, deskripsi, foto_bukti, status)
       VALUES (date('now'), ?, ?, ?, ?, ?, ?, ?, 'PENDING')
-    `, [sopir_id, req.assignment.kendaraan_id, Number(latitude || -8.17), Number(longitude || 113.70), jenis_bahaya, deskripsi, fotoBukti]);
+    `, [sopir_id, req.assignment.kendaraan_id, latitude == null || latitude === '' ? null : Number(latitude), longitude == null || longitude === '' ? null : Number(longitude), jenis_bahaya, deskripsi, fotoBukti]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -265,7 +279,7 @@ app.get('/api/manager/summary', async (req, res) => {
       inspeksi,
       pengiriman,
       laporanBahaya,
-      kpiData,
+      kpiData: await loadPerformance(queryAll, date),
       permintaanLpg,
       semuaSopir,
       currentPositions,
@@ -331,91 +345,21 @@ app.post('/api/manager/stock', async (req, res) => {
 
 app.post('/api/manager/kpi', async (req, res) => {
   const tanggal = req.body?.tanggal || formatDate();
-  const entries = Array.isArray(req.body?.entries) ? req.body.entries : [];
-  try {
-    if (entries.some(e => e.nilai !== '' && e.nilai != null && (!Number.isInteger(Number(e.nilai)) || Number(e.nilai) < 0 || Number(e.nilai) > 100))) return res.status(400).json({ error: 'Nilai KPI harus antara 0 dan 100.' });
-    await database.begin(async (tx) => {
-      await tx.unsafe('DELETE FROM kpi_sopir WHERE tanggal = $1', [tanggal]);
-      for (const entry of entries) {
-        if (entry.nilai === '' || entry.nilai == null) continue;
-        await tx.unsafe("INSERT INTO kpi_sopir (tanggal, sopir_id, nilai, catatan, input_by) VALUES ($1, $2, $3, $4, 'manager')", [tanggal, Number(entry.sopirId), Number(entry.nilai), entry.catatan || '']);
-      }
-    });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Gagal menyimpan KPI.' });
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return res.status(400).json({ error: 'Tanggal tidak valid.' });
+  const performance = await loadPerformance(queryAll, tanggal);
+  await database.begin(async tx => {
+    await tx.unsafe('SELECT pg_advisory_xact_lock(hashtext($1))', ['kpi:' + tanggal]);
+    await tx.unsafe('DELETE FROM kpi_sopir WHERE tanggal=$1', [tanggal]);
+    for (const p of performance) await tx.unsafe(`INSERT INTO kpi_sopir (tanggal,sopir_id,nilai,catatan,input_by) VALUES ($1,$2,$3,$4,'sistem')
+      `, [tanggal,p.sopirId,p.total,p.catatanOtomatis]);
+  });
+  res.json({ ok: true });
 });
 
 app.get('/api/manager/kpi/recommendations', async (req, res) => {
   const date = req.query.date || formatDate();
   try {
-    const semuaSopir = await queryAll('SELECT id, username, nama, lisensi_expiry, k3_expiry, sertifikat_k3, sertifikat_submitted_at, nomor_hp FROM sopir ORDER BY nama');
-    const [inspeksiRows, pengirimanRows, ruteRows, bahayaRows] = await Promise.all([
-      queryAll('SELECT * FROM inspeksi_pagi WHERE tanggal = ?', [date]),
-      queryAll('SELECT * FROM pengiriman WHERE tanggal = ?', [date]),
-      queryAll('SELECT * FROM rute_harian WHERE tanggal = ? AND urutan > 0', [date]),
-      queryAll('SELECT * FROM laporan_bahaya WHERE tanggal = ?', [date])
-    ]);
-
-    const results = semuaSopir.map((s) => {
-      const ins = inspeksiRows.find((i) => i.sopir_id === s.id);
-      const deliveryList = pengirimanRows.filter((p) => p.sopir_id === s.id);
-      const routeList = ruteRows.filter((r) => r.sopir_id === s.id);
-      const hazardList = bahayaRows.filter((b) => b.sopir_id === s.id);
-
-      // 1. Skor Keselamatan Kendaraan (Bobot 30%)
-      let scoreInspeksi = 0;
-      let ketInspeksi = 'Belum inspeksi';
-      if (ins) {
-        const counts = countLolos(ins);
-        const pct = counts.total > 0 ? (counts.lolos / counts.total) * 100 : 0;
-        if (ins.status_validasi === 'AMAN') {
-          scoreInspeksi = 100;
-          ketInspeksi = `Lolos inspeksi (${counts.lolos}/${counts.total} item)`;
-        } else if (ins.status_validasi === 'TIDAK_AMAN') {
-          scoreInspeksi = Math.max(30, Math.round(pct * 0.5));
-          ketInspeksi = `Tidak aman (${counts.tidakBaik} catatan)`;
-        } else {
-          scoreInspeksi = Math.round(pct * 0.85);
-          ketInspeksi = `Menunggu validasi (${counts.lolos}/${counts.total} item)`;
-        }
-      }
-
-      // 2. Skor Pengiriman & Target Tabung (Bobot 40%)
-      const targetPangkalan = routeList.length || 5;
-      const completedCount = deliveryList.length;
-      const totalTabungKirim = deliveryList.reduce((sum, p) => sum + safeNumber(p.jumlah_dikirim_kg), 0);
-      let scorePengiriman = Math.min(100, Math.round((completedCount / targetPangkalan) * 100));
-      let ketPengiriman = `${completedCount}/${targetPangkalan} pangkalan (${totalTabungKirim} tabung)`;
-
-      // 3. Skor Kepatuhan & Zero Incident K3 (Bobot 30%)
-      let scoreKepatuhan = 100;
-      let ketKepatuhan = 'Nihil insiden & rute aman';
-      if (hazardList.length > 0) {
-        scoreKepatuhan = Math.max(50, 100 - (hazardList.length * 25));
-        ketKepatuhan = `${hazardList.length} laporan bahaya`;
-      }
-
-      // Skor Gabungan (0-100)
-      const rekomendasiNilai = Math.round((scoreInspeksi * 0.3) + (scorePengiriman * 0.4) + (scoreKepatuhan * 0.3));
-      const catatanOtomatis = `Evaluasi ${date}: Inspeksi ${scoreInspeksi}% (${ketInspeksi}), Pengiriman ${scorePengiriman}% (${ketPengiriman}), Safety ${scoreKepatuhan}% (${ketKepatuhan}).`;
-
-      return {
-        sopirId: s.id,
-        nama: s.nama,
-        scoreInspeksi,
-        scorePengiriman,
-        scoreKepatuhan,
-        ketInspeksi,
-        ketPengiriman,
-        ketKepatuhan,
-        rekomendasiNilai,
-        catatanOtomatis
-      };
-    });
-
+    const results = await loadPerformance(queryAll, date);
     res.json({ date, recommendations: results });
   } catch (err) {
     console.error(err);
@@ -502,7 +446,9 @@ app.get('/api/manager/export.xlsx', async (req, res) => {
     setupSheet('Pengiriman', ['ID', 'Sopir', 'Kendaraan', 'Pangkalan', 'Jumlah (tabung)', 'Penerima', 'No. HP Penerima', 'Kondisi', 'Waktu Tiba', 'Waktu Selesai', 'Catatan', 'Jam Submit WITA'], pengiriman.map((item) => [item.id, item.sopir_nama, item.plat_nomor || '', item.pangkalan_nama || '', item.jumlah_dikirim_kg || 0, item.penerima_nama || '', item.penerima_hp || '', item.kondisi_pengiriman || '', item.waktu_tiba || '', item.waktu_selesai || '', item.catatan || '', formatWaktuLengkap(item.created_at)]));
     setupSheet('Permintaan LPG', ['ID', 'Sopir', 'Kendaraan', 'Jumlah (tabung)', 'Status', 'Catatan', 'Diajukan WITA', 'Disetujui Oleh', 'Waktu Persetujuan'], permintaanLpg.map((item) => [item.id, item.sopir_nama, item.plat_nomor || '', item.jumlah_diminta, item.status, item.catatan || '', formatWaktu(item.created_at), item.disetujui_oleh || '', formatWaktu(item.waktu_disetujui)]));
     setupSheet('Laporan Bahaya', ['ID', 'Sopir', 'Tanggal', 'Jenis Bahaya', 'Deskripsi', 'Latitude', 'Longitude', 'Status', 'Tanggapan Admin', 'Waktu Lapor WITA'], laporanBahaya.map((item) => [item.id, item.sopir_nama, item.tanggal, item.jenis_bahaya || '', item.deskripsi || '', item.latitude, item.longitude, item.status || '', item.admin_response || '', formatWaktu(item.created_at)]));
-    setupSheet('KPI Sopir', ['Tanggal', 'Sopir', 'Nilai (%)', 'Catatan', 'Input Oleh', 'Waktu Input WITA'], kpi.map((item) => [item.tanggal, item.sopir_nama, item.nilai, item.catatan || '', item.input_by || '', formatWaktu(item.created_at)]));
+    const livePerformance = await loadPerformance(queryAll, tanggal);
+    setupSheet('Rincian KPI', ['Sopir','No','Area Kinerja Utama','Key Performance Indicator','Bobot KPI','Target (%)','Realisasi (%)','Skor','Skor Akhir'], livePerformance.flatMap(p => p.items.map(i => [p.nama,i.no,i.area,i.indicator,i.weight,i.target,i.realization,i.score,i.finalScore])));
+    setupSheet('KPI Sopir', ['Tanggal', 'Sopir', 'Nilai (%)', 'Catatan', 'Input Oleh', 'Waktu Input WITA'], livePerformance.map(item => [tanggal,item.nama,item.total,item.catatanOtomatis,'sistem','']));
     setupSheet('Rute Harian', ['Tanggal', 'Sopir', 'Kendaraan', 'Urutan', 'Pangkalan', 'Latitude', 'Longitude', 'Permintaan Ton', 'Estimasi Tiba'], rute.map((item) => [item.tanggal, item.sopir_nama, item.plat_nomor || '', item.urutan, item.pangkalan_nama, item.latitude, item.longitude, item.permintaan_ton, item.estimasi_waktu_tiba]));
     setupSheet('Posisi GPS', ['Sopir', 'Kendaraan', 'Latitude', 'Longitude', 'Akurasi (m)', 'Terakhir Diperbarui WITA', 'Status'], posisi.map((item) => [item.sopir_nama, item.plat_nomor || '', item.latitude, item.longitude, item.accuracy || '', formatWaktu(item.updated_at), Date.now() - new Date(item.updated_at).getTime() <= 120000 ? 'Aktif' : 'Tidak aktif']));
     setupSheet('Data Sopir', ['ID', 'Nama', 'Username', 'Nomor HP', 'Lisensi Berlaku Sampai', 'K3 Berlaku Sampai', 'Jam Submit Sertifikat WITA'], sopir.map((item) => [item.id, item.nama, item.username, item.nomor_hp || '', item.lisensi_expiry || '', item.k3_expiry || '', formatWaktuLengkap(item.sertifikat_submitted_at)]));

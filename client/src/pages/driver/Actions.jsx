@@ -10,6 +10,7 @@ export default function DriverActions() {
   const siapBerangkat = data?.siapBerangkat;
 
   const menus = [
+    { to: '/sopir/bahaya', title: 'Laporkan Bahaya & MSDS LPG', desc: 'Laporkan kejadian dan baca panduan tanggap darurat LPG', icon: 'alert', badge: 'Keselamatan' },
     {
       to: '/sopir/inspeksi-form',
       title: 'Inspeksi Pagi Armada',
