@@ -11,6 +11,7 @@ import { largeMedia } from './large-media.js';
 import { registerMonitoring } from './monitoring.js';
 import { r2Configuration, r2Storage, isR2Name } from './r2.js';
 import { registerStorageRoutes } from './storage-routes.js';
+import { mediaDeletion } from './media-deletion.js';
 
 const database = openDatabase(Deno.env.get('SUPABASE_DB_URL'));
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -19,8 +20,8 @@ const r2 = r2Storage(database, r2Configuration((name: string) => Deno.env.get(na
 const files = storage(supabase, media, r2);
 const app = createRouter();
 registerRoutes(app, { ...queries(database), database, upload, ...files });
-registerOperations(app, { ...queries(database), database });
-registerMonitoring(app, { ...queries(database), database, upload, ...files });
+registerOperations(app, { ...queries(database), database, googleKey: () => Deno.env.get('GOOGLE_ROUTES_API_KEY') || '' });
+registerMonitoring(app, { ...queries(database), database, upload, ...files, removeMedia: mediaDeletion(database,supabase,r2,isR2Name) });
 registerStorageRoutes(app, { database, supabase, media, r2 });
 let routeDate = '';
 let routePreparation: Promise<void> | null = null;

@@ -33,6 +33,18 @@ function ReviewControl({ report, reload }) {
   </div>;
 }
 
+function DeleteMedia({report,reload}) {
+  const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  const remove=async()=>{
+    if(!window.confirm(`Hapus foto/video laporan ${report.nama}? Rekaman yang dihapus tidak dapat dikembalikan.`))return;
+    setBusy(true);setError('');
+    try{await apiJson(`/manager/fatigue/${report.id}/delete-media`,{});await reload();}
+    catch(err){setError(err.message);await reload();}finally{setBusy(false);}
+  };
+  if(!report.foto&&!report.video&&!report.deleted_media?.length)return null;
+  return <div className="mt-sm"><button className="btn btn-sm btn-outline text-red" disabled={busy} onClick={remove}>{busy?'Menghapus...':'Hapus Rekaman'}</button>{error&&<p role="alert">{error}</p>}</div>;
+}
+
 export default function ActivityReports({ date, compact = false }) {
   const { data, error, loading, reload } = useApi('/manager/activity', { params: { date }, interval: 15000 });
   const reports = data?.reports || [];
@@ -61,8 +73,10 @@ export default function ActivityReports({ date, compact = false }) {
         {(compact ? reports.slice(0, 3) : reports).map(report => <article className="fatigue-report" key={report.id}>
           <strong>{report.nama}</strong> <span className={`badge badge-${report.status === 'MENUNGGU' ? 'warn' : report.status === 'FIT' ? 'ok' : 'bad'}`}>{report.status === 'MENUNGGU' ? 'Menunggu Review' : report.status === 'FIT' ? 'Fit' : 'Perlu Istirahat'}</span>
           <small className="muted block">Jam rekam: {fmtSubmit(report.captured_at)}</small><small className="muted block">Jam submit: {fmtSubmit(report.created_at)}</small>
-          {!compact && <EvidencePreview report={report} />}
+          {!compact && (report.foto || report.video) && <EvidencePreview report={report} />}
+          {report.media_deleted_at && <p className="muted">Foto/video dihapus oleh {report.media_deleted_by} pada {fmtSubmit(report.media_deleted_at)}. Riwayat laporan tetap tersimpan.</p>}
           {!compact && <ReviewControl report={report} reload={reload} />}
+          {!compact && <DeleteMedia report={report} reload={reload}/>}
         </article>)}
         {!reports.length && <p>Belum ada rekaman pada tanggal ini.</p>}
       </div>

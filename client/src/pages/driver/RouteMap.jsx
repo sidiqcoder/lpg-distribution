@@ -33,7 +33,7 @@ export default function DriverRouteMap() {
     if (data.origin) {
       const origin = [Number(data.origin.latitude), Number(data.origin.longitude)];
       latlngs.unshift(origin);
-      L.marker(origin, { icon: numberIcon('#1d4ed8', 'Awal') }).addTo(layerRef.current).bindPopup('Pangkalan: titik awal keberangkatan sesuai PDF');
+      L.marker(origin, { icon: numberIcon('#1d4ed8', 'Awal') }).addTo(layerRef.current).bindPopup('Gudang: titik awal keberangkatan');
     }
     L.polyline(latlngs, { color: '#b91c1c', weight: 4, dashArray: '6 6' }).addTo(layerRef.current);
     points.forEach((p) => {
@@ -55,7 +55,7 @@ export default function DriverRouteMap() {
           </div>
           <h1>Peta Rute Distribusi</h1>
           <p className="subtitle">
-            Sopir: <strong>{user.nama}</strong> &middot; Urutan tujuan sesuai penugasan dan dokumen rute
+            Sopir: <strong>{user.nama}</strong> &middot; Urutan tujuan sesuai penugasan harian
           </p>
         </div>
         <div className="head-badge-wrapper">
@@ -69,13 +69,14 @@ export default function DriverRouteMap() {
       </div>
 
       <div className="card">
+        {data?.route_source && <p className="banner warn">Sumber rute: {data.route_source}</p>}
         {error && <p className="banner warn" role="alert">{error.message}<button className="btn btn-sm btn-outline" onClick={reload}>Coba Lagi</button></p>}
         <MapCanvas height={540} onReady={(m) => { mapRef.current = m; setReadyMap(m); }} />
         <div className="map-legend-bar mt-sm">
-          <span>Penanda biru menunjukkan titik keberangkatan. Tambahan tujuan mengikuti urutan PDF; nama tujuan sementara memakai nomor karena dokumen hanya berisi koordinat.</span>
+          <span>Penanda biru menunjukkan gudang. Rute baru memakai Saving Matrix + Nearest Neighbor. Penugasan yang sudah berjalan tetap dipertahankan. Garis menghubungkan urutan tujuan, bukan geometri jalan.</span>
         </div>
       </div>
-      {data?.rute?.length > 0 && <div className="card mt"><h2>Daftar Tujuan</h2><ol>{data.rute.map(r => <li key={r.id || r.urutan}>{r.pangkalan_nama} · {r.latitude}, {r.longitude}</li>)}</ol></div>}
+      {data?.rute?.length > 0 && <div className="card mt"><h2>Daftar Tujuan</h2><ol>{data.rute.map(r => <li key={r.id || r.urutan}>{r.pangkalan_nama} · Permintaan: {r.permintaan_tabung ?? 0} Tabung · Batas tiba: {r.estimasi_waktu_tiba} WITA</li>)}</ol></div>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import MsdsGuide from '../../components/MsdsGuide';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import MapCanvas, { L, truckIcon, locationIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, truckIcon, locationIcon, escapeHtml } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
 import { apiForm } from '../../api';
@@ -43,11 +43,15 @@ export default function DriverOnDuty() {
     if (!map || !data || !summary?.siapBerangkat) return;
     const points = (data.origin ? [data.origin, ...rute] : rute).map((r) => ({ lat: Number(r.latitude), lng: Number(r.longitude) }));
     if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
+    lineRef.current=L.layerGroup().addTo(map);
     if (points.length > 1) {
-      lineRef.current = L.polyline(points.map((p) => [p.lat, p.lng]), { color: '#b91c1c', weight: 5, dashArray: '8 8' }).addTo(map);
+      L.polyline(points.map((p) => [p.lat, p.lng]), { color: '#b91c1c', weight: 5, dashArray: '8 8' }).addTo(lineRef.current);
       if (!fittedRef.current && !map.lpgUserMoved) map.fitBounds(points.map((p) => [p.lat, p.lng]), { padding: [30, 30] });
       fittedRef.current = true;
     }
+    rute.filter(r=>r.urutan>0).forEach(r=>L.marker([Number(r.latitude),Number(r.longitude)],{icon:locationIcon('#b91c1c')})
+      .addTo(lineRef.current).bindTooltip(`${r.urutan}. ${escapeHtml(r.pangkalan_nama)}`)
+      .bindPopup(`${r.urutan}. ${escapeHtml(r.pangkalan_nama)}<br>Permintaan: ${Number(r.permintaan_tabung)||0} Tabung<br>Batas tiba: ${escapeHtml(r.estimasi_waktu_tiba||'-')} WITA`));
   }, [data, readyMap, summary?.siapBerangkat]);
 
   useEffect(() => {

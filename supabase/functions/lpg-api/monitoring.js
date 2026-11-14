@@ -1,7 +1,7 @@
 import { formatDate } from './format.js';
 const fail = (message) => Object.assign(new Error(message), { status: 400 });
 
-export function registerMonitoring(app, { database, queryAll, queryOne, upload, saveUploadedFile }) {
+export function registerMonitoring(app, { database, queryAll, queryOne, upload, saveUploadedFile, removeMedia }) {
   app.get('/api/driver/:id/fatigue', async (req, res) => {
     const id = Number(req.params.id);
     const monitoring = await queryOne('SELECT * FROM driver_monitoring WHERE sopir_id = ?', [id]);
@@ -71,5 +71,26 @@ export function registerMonitoring(app, { database, queryAll, queryOne, upload, 
       WHERE id = $4 RETURNING id`, [status, note.trim(), req.user.nama, Number(req.params.id)]);
     if (!rows.length) return res.status(404).json({ error: 'Laporan tidak ditemukan.' });
     res.json({ ok: true });
+  });
+
+  app.post('/api/manager/fatigue/:id/delete-media', async (req,res) => {
+    const id=Number(req.params.id);
+    if(!Number.isSafeInteger(id)||id<1) throw fail('ID laporan tidak valid.');
+    const report=await database.begin(async tx=>{
+      const [row]=await tx.unsafe('SELECT * FROM fatigue_reports WHERE id=$1 FOR UPDATE',[id]);
+      if(!row) throw Object.assign(new Error('Laporan tidak ditemukan.'),{status:404});
+      const files=row.deleted_media||[row.foto,row.video].filter(Boolean);
+      await tx.unsafe(`UPDATE fatigue_reports SET foto=NULL,video=NULL,deleted_media=$2::jsonb,
+        media_deleted_at=coalesce(media_deleted_at,now()),media_deleted_by=coalesce(media_deleted_by,$3) WHERE id=$1`,[id,JSON.stringify(files),req.user.nama]);
+      return {files};
+    });
+    try {
+      await removeMedia(report.files);
+      await database.unsafe('UPDATE fatigue_reports SET deleted_media=NULL WHERE id=$1',[id]);
+      res.json({ok:true});
+    } catch(error) {
+      console.error('Fatigue media cleanup:',error.message);
+      res.status(503).json({error:'Rekaman telah disembunyikan. Penghapusan file belum selesai; tekan Hapus Rekaman lagi untuk mencoba ulang.'});
+    }
   });
 }

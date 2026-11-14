@@ -157,6 +157,7 @@ export function r2Storage(database, config, clientOverride) {
     for (const file of files) for (const key of [file.object_key, file.staging_key]) {
       const response = await fetchObject(key, { method: 'DELETE' });
       await response.body?.cancel();
+      if(!response.ok && response.status!==404) throw new Error('Penghapusan objek R2 gagal. Silakan coba lagi.');
     }
     await database.unsafe('DELETE FROM lpg_private.r2_files WHERE filename = ANY($1::text[])', [files.map(file => file.filename)]);
     return files.map(file => file.filename);

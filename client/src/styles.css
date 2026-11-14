@@ -2132,6 +2132,7 @@ table.table-hover tr:hover td {
   }
 }
 .fatigue-preview { width: 100%; max-width: 400px; max-height: 300px; object-fit: contain; background: #0f172a; border-radius: 10px; }
+.demand-location-status { display: block; margin-top: 4px; color: #64748b; font-size: 12px; }
 .fatigue-report { border-top: 1px solid #e2e8f0; padding: 16px 0; }
 .fatigue-monitor .flex-row { flex-wrap: wrap; }
 .fatigue-monitor select { max-width: 100%; }

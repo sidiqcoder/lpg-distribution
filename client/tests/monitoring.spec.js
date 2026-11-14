@@ -161,14 +161,14 @@ test('on-duty map recovers when approval changes while GPS and route polling con
     { latitude: -8.18, longitude: 113.71, urutan: 2, pangkalan_nama: 'Pangkalan Uji B', permintaan_ton: 1 }
   ] });
   await session(context, 'driver'); await page.goto('/sopir/on-duty');
-  await expect(page.locator('.map')).toBeVisible(); await expect(page.locator('.leaflet-marker-icon')).toHaveCount(1);
+  await expect(page.locator('.map')).toBeVisible(); await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
   state.driverSummary.siapBerangkat = false;
   await expect(page.getByText('Akses Pengiriman Belum Diizinkan')).toBeVisible();
   const reads = state.routeReads;
   await expect.poll(() => state.routeReads).toBeGreaterThan(reads);
   await expect(page.getByText('Halaman belum dapat ditampilkan')).toHaveCount(0);
   state.driverSummary.siapBerangkat = true;
-  await expect(page.locator('.map')).toBeVisible(); await expect(page.locator('.leaflet-marker-icon')).toHaveCount(1);
+  await expect(page.locator('.map')).toBeVisible(); await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
   expect(errors).toEqual([]);
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import MapCanvas, { L, truckIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, truckIcon,locationIcon,escapeHtml } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { useAuth } from '../../auth';
 
@@ -19,17 +19,25 @@ export default function DriverMap() {
     const map = mapRef.current;
     if (!map || !data) return;
     const item = data.find((e) => Number(e.sopir_id) === Number(user.id));
-    if (!item || item.latitude == null || item.longitude == null) return;
-    const point = [Number(item.latitude), Number(item.longitude)];
+    if (!item) return;
     const route = item.route || [];
     if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
+    lineRef.current=L.layerGroup().addTo(map);
     if (route.length > 1) {
-      lineRef.current = L.polyline(route.map((r) => [Number(r.latitude), Number(r.longitude)]), {
+      L.polyline(route.map((r) => [Number(r.latitude), Number(r.longitude)]), {
         color: '#b91c1c',
         weight: 5,
         dashArray: '8 8'
-      }).addTo(map);
+      }).addTo(lineRef.current);
     }
+    route.filter(r=>r.urutan>0).forEach(r=>L.marker([Number(r.latitude),Number(r.longitude)],{icon:locationIcon('#b91c1c')})
+      .addTo(lineRef.current).bindTooltip(`${r.urutan}. ${escapeHtml(r.pangkalan_nama)}`)
+      .bindPopup(`${r.urutan}. ${escapeHtml(r.pangkalan_nama)}<br>Permintaan: ${Number(r.permintaan_tabung)||0} Tabung<br>Batas tiba: ${escapeHtml(r.estimasi_waktu_tiba||'-')} WITA`));
+    if(item.latitude==null||item.longitude==null) {
+      if(route.length&&!centeredRef.current&&!map.lpgUserMoved)map.fitBounds(route.map(r=>[Number(r.latitude),Number(r.longitude)]),{padding:[30,30]});
+      return;
+    }
+    const point = [Number(item.latitude), Number(item.longitude)];
     const icon = truckIcon('#b91c1c', 16);
     if (markerRef.current) {
       markerRef.current.setLatLng(point).setIcon(icon);

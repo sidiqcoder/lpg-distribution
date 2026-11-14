@@ -1,5 +1,7 @@
 # Sistem Distribusi LPG — PT Macan Gading
 
+Revisi kedua (14 November 2026): menu **Permintaan per Lokasi**, pembagian **Saving Matrix + Nearest Neighbor**, perhitungan **Safety Stock / Reorder Point**, dan hapus foto/video fatigue. Lihat [catatan penerapan dan integrasi Google Maps yang masih menunggu API key](docs/revisi-kedua.md).
+
 Frontend React/Vite siap di-host sebagai website statis di Vercel. Seluruh API berjalan di Supabase Edge Functions; data operasional disimpan di PostgreSQL Supabase. Video menggunakan Cloudflare R2 privat setelah dikonfigurasi; foto/PDF dan lampiran lama tetap dapat dibaca dari Supabase Storage. Frontend lokal terhubung langsung ke project cloud yang sama.
 
 Project: [lpg di Supabase](https://supabase.com/dashboard/project/nwqnzhegnejtffqsoalx). Region: Tokyo (`ap-northeast-1`). Backend: `supabase/functions/lpg-api/index.ts`. Frontend: `client/src/main.jsx`.

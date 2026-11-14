@@ -36,7 +36,7 @@ test('existing logins, all pages, session restore, access restrictions and Excel
   expect(summary.status).toBe(200);
   expect(summary.data.semuaSopir.some(driver => driver.username === 'budi')).toBeTruthy();
   expect(JSON.stringify(summary.data)).not.toContain('password');
-  for (const path of ['/manager/stok', '/manager/inspeksi', '/manager/pengiriman', '/manager/pelacakan', '/manager/kpi', '/manager/bahaya', '/manager/sertifikat']) {
+  for (const path of ['/manager/permintaan', '/manager/stok', '/manager/inspeksi', '/manager/pengiriman', '/manager/pelacakan', '/manager/kpi', '/manager/bahaya', '/manager/sertifikat']) {
     await page.goto(path);
     await expect(page.locator('main .page-head')).toBeVisible();
     await expect(page.locator('main')).not.toContainText(/Gagal Memuat/);

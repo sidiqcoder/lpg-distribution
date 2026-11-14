@@ -51,13 +51,14 @@ Deno.test('six KPI weights and formulas use GPS, checklist completion, and prede
 });
 Deno.test('manual demand rejects invalid quantities before mutation and writes valid changes atomically', async () => {
   const app=createRouter(); const writes=[];
-  registerOperations(app,{queryAll:()=>[],database:{begin:fn=>fn({unsafe:async(sql,args)=>{writes.push(args);return [{id:args[1]}];}})}});
+  registerOperations(app,{queryAll:()=>[],database:{begin:fn=>fn({unsafe:async(sql,args)=>{writes.push({sql,args});return [];}})}});
   const handler=app.match('POST','/api/manager/demands').handler;
   const future='2099-01-01';
   for (const quantity of [-1,1.5,'56',NaN]) await assert.rejects(()=>handler({body:{date:future,entries:[{id:1,quantity}]}},{}),{status:400});
   assert.equal(writes.length,0);
   let result;
-  await handler({body:{date:future,entries:[{id:1,quantity:72}]}},{json:value=>{result=value;}});
-  assert.deepEqual(writes,[[72,1,future]]);
+  await handler({user:{nama:'Manager'},body:{date:future,entries:[{location_no:1,quantity:72}]}},{json:value=>{result=value;}});
+  assert.deepEqual(writes.find(w=>w.sql.startsWith('INSERT INTO location_demands')).args,[future,1,72,'Manager']);
+  assert.deepEqual(writes.find(w=>w.sql.startsWith('UPDATE rute_harian')).args,[72,future,LOCATIONS[0].latitude,LOCATIONS[0].longitude]);
   assert.equal(result.ok,true);
 });

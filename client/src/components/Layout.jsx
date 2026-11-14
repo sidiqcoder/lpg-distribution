@@ -25,7 +25,8 @@ function getNavigationGroups(role) {
       {
         title: 'Manajemen Logistik',
         items: [
-          { to: '/manager/stok', label: 'Persediaan & Permintaan LPG', icon: 'cylinder' },
+          { to: '/manager/permintaan', label: 'Permintaan per Lokasi', icon: 'clipboard' },
+          { to: '/manager/stok', label: 'Persediaan & Pengajuan LPG', icon: 'cylinder' },
           { to: '/manager/inspeksi', label: 'Laporan Inspeksi Pagi', icon: 'clipboard' },
           { to: '/manager/pengiriman', label: 'Monitoring Pengiriman', icon: 'package' },
           { to: '/manager/pelacakan', label: 'Pelacakan GPS Sopir', icon: 'map-pin' }

@@ -31,6 +31,7 @@ const ManagerKpi = lazy(() => import('./pages/manager/Kpi'));
 const ManagerHazards = lazy(() => import('./pages/manager/Hazards'));
 const ManagerReview = lazy(() => import('./pages/manager/Review'));
 const ManagerActivity = lazy(() => import('./pages/manager/Activity'));
+const ManagerDemands = lazy(() => import('./pages/manager/Demands'));
 
 export default function App() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="inspeksi" element={<ManagerInspections />} />
             <Route path="pengiriman" element={<ManagerDeliveries />} />
             <Route path="stok" element={<ManagerStock />} />
+            <Route path="permintaan" element={<ManagerDemands />} />
             <Route path="kpi" element={<ManagerKpi />} />
             <Route path="bahaya" element={<ManagerHazards />} />
             <Route path="aktivitas" element={<ManagerActivity />} />

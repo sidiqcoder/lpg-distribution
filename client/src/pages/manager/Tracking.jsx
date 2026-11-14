@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import MapCanvas, { L, truckIcon } from '../../components/MapCanvas';
+import MapCanvas, { L, truckIcon,locationIcon,escapeHtml } from '../../components/MapCanvas';
 import { useApi } from '../../hooks';
 import { fmtSubmit } from '../../utils';
 import { routeStatus, waLink } from '../../tracking';
@@ -23,6 +23,13 @@ export default function ManagerTracking() {
     if (routes.current) map.removeLayer(routes.current);
     routes.current = L.layerGroup().addTo(map);
     data.forEach(item => {
+      const routeColor=item.sopir_id===1?'#b91c1c':'#2563eb';
+      if(item.route?.length>1) {
+        L.polyline(item.route.map(stop=>[Number(stop.latitude),Number(stop.longitude)]),{color:routeColor,weight:3,dashArray:'6 6'}).addTo(routes.current);
+        item.route.filter(stop=>stop.urutan>0).forEach(stop=>L.marker([Number(stop.latitude),Number(stop.longitude)],{icon:locationIcon(routeColor)})
+          .addTo(routes.current).bindTooltip(`${stop.urutan}. ${escapeHtml(stop.pangkalan_nama)}`)
+          .bindPopup(`${escapeHtml(item.nama)} · ${stop.urutan}. ${escapeHtml(stop.pangkalan_nama)}<br>Permintaan: ${Number(stop.permintaan_tabung)||0} Tabung<br>Batas tiba: ${escapeHtml(stop.estimasi_waktu_tiba||'-')} WITA`));
+      }
       if (item.latitude == null || item.longitude == null) return;
       const point = [Number(item.latitude), Number(item.longitude)];
       const status = routeStatus(item);
@@ -31,11 +38,11 @@ export default function ManagerTracking() {
       popup.textContent = `${item.nama} · ${status.label} · Akurasi ${Number(item.accuracy || 0).toFixed(0)} m · ${fmtSubmit(item.updated_at)}`;
       if (markers.current.has(item.sopir_id)) markers.current.get(item.sopir_id).setLatLng(point).setIcon(truckIcon(color)).setPopupContent(popup);
       else markers.current.set(item.sopir_id, L.marker(point, { icon: truckIcon(color) }).addTo(map).bindPopup(popup));
-      if (item.route?.length > 1) L.polyline(item.route.map(stop => [Number(stop.latitude), Number(stop.longitude)]), { color: '#2563eb', weight: 3, dashArray: '6 6' }).addTo(routes.current);
     });
     const located = data.filter(item => item.latitude != null && item.longitude != null);
-    if (located.length && !fitted.current) {
-      if (!map.lpgUserMoved) map.fitBounds(located.map(item => [Number(item.latitude), Number(item.longitude)]), { padding: [40, 40], maxZoom: 15 });
+    const bounds=located.map(item=>[Number(item.latitude),Number(item.longitude)]).concat(data.flatMap(item=>(item.route||[]).map(stop=>[Number(stop.latitude),Number(stop.longitude)])));
+    if (bounds.length && !fitted.current) {
+      if (!map.lpgUserMoved) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
       fitted.current = true;
     }
   }, [map, data]);
@@ -46,7 +53,7 @@ export default function ManagerTracking() {
       <div className="head-actions"><button type="button" className="btn btn-outline" onClick={reload}><Icon name="refresh" size={14} /> Refresh Koordinat</button><button type="button" className="btn btn-outline" onClick={showFleet} disabled={!points.length}>Lihat Semua Sopir</button></div>
     </div>
     {error && <div className="banner warn mb" role="alert">{data ? 'Pembaruan GPS gagal. Menampilkan data terakhir. ' : ''}{error.message}<button className="btn btn-sm btn-outline ml" onClick={reload}>Coba Lagi</button></div>}
-    <div className="card mb"><MapCanvas height={460} onReady={setMap} /><div className="map-legend-bar mt-sm">Hijau: rute sesuai · Merah: keluar rute · Abu-abu: lokasi terakhir · Garis biru: rute ditentukan</div></div>
+    <div className="card mb"><MapCanvas height={460} onReady={setMap} /><div className="map-legend-bar mt-sm">Garis merah: rute Budi · Garis biru: rute Ahmad. Warna kendaraan menunjukkan status GPS dan kepatuhan rute.</div></div>
     <div className="stat-grid mt">
       {drivers.map(pos => {
         const status = routeStatus(pos);

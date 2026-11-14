@@ -34,7 +34,7 @@ app.get('/api/tracking', async (req, res) => {
       WHERE (?::int IS NULL OR s.id = ?) ORDER BY s.nama
     `, [formatDate(), req.user.role === 'driver' ? req.user.id : null, req.user.role === 'driver' ? req.user.id : null]);
     const routes = await queryAll(`
-      SELECT sopir_id, urutan, latitude, longitude, pangkalan_nama FROM rute_harian WHERE tanggal = ? ORDER BY sopir_id, urutan
+      SELECT sopir_id, urutan, latitude, longitude, pangkalan_nama,permintaan_tabung,estimasi_waktu_tiba FROM rute_harian WHERE tanggal = ? ORDER BY sopir_id, urutan
     `, [formatDate()]);
     const routeMap = new Map();
     routes.forEach((r) => { if (!routeMap.has(r.sopir_id)) routeMap.set(r.sopir_id, []); routeMap.get(r.sopir_id).push(r); });
@@ -105,7 +105,8 @@ app.get('/api/driver/:id/routes', async (req, res) => {
   try {
     const rute = await queryAll('SELECT * FROM rute_harian WHERE sopir_id = ? AND tanggal = ? ORDER BY urutan ASC', [id, today]);
     const deliveredRows = await queryAll('SELECT * FROM pengiriman WHERE sopir_id = ? AND tanggal = ?', [id, today]);
-    res.json({ rute: scheduledStops(rute, today), origin: rute.find(r => r.urutan === 0) || null, delivered: rute.filter(r => r.urutan > 0 && deliveryFor(r, deliveredRows)).map(r => r.pangkalan_nama) });
+    const source=rute.find(r=>r.urutan>0)?.sumber||'';
+    res.json({ rute: scheduledStops(rute, today), route_source:source==='saving-nn-v2-document'?'Matriks contoh revisi 2; integrasi Google Maps menunggu API key':source.startsWith('saving-nn-v2-')?'Google Routes API (jarak saat perhitungan)':'Penugasan tersimpan', origin: rute.find(r => r.urutan === 0) || null, delivered: rute.filter(r => r.urutan > 0 && deliveryFor(r, deliveredRows)).map(r => r.pangkalan_nama) });
   } catch (err) { res.status(500).json({ error: 'Gagal membaca rute.' }); }
 });
 

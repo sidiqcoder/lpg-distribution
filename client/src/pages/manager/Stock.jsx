@@ -1,4 +1,5 @@
 import RefreshNotice from '../../components/RefreshNotice';
+import InventoryPlanning from '../../components/InventoryPlanning';
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useApi } from '../../hooks';
@@ -138,6 +139,7 @@ export default function ManagerStock() {
         </div>
       )}
 
+      <InventoryPlanning date={date}/>
       {/* Stock Warehouse Card */}
       <div className="card mb stock-hero-card">
         <div className="stock-hero-inner">
@@ -151,9 +153,7 @@ export default function ManagerStock() {
             </div>
             <div className="stock-metric-meta">
               <span>Status Stok: </span>
-              <strong className={data.persediaanLpg < 200 ? 'text-red' : 'text-green'}>
-                {data.persediaanLpg < 200 ? 'Stok Kritis / Menipis' : 'Persediaan Aman'}
-              </strong>
+              <strong>Lihat batas Reorder Point di atas</strong>
             </div>
           </div>
 
